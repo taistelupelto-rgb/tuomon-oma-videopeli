@@ -146,6 +146,8 @@ var river_mat: StandardMaterial3D
 var river_cells: Array = []
 var torches: Array = []
 var rain: GPUParticles3D
+var shit_trail: GPUParticles3D
+var hero_moving := false
 
 var hud_top: Label
 var hud_cap: Label
@@ -1313,6 +1315,7 @@ func _physics_process(delta: float) -> void:
 	player_node.move_and_slide()
 	player_node.rotation.y = yaw + PI # face away (back view)
 	var moving := mag > 0.1
+	hero_moving = moving
 	if moving:
 		walk_phase += 9.0 * delta
 	# --- camera rig follows ---
@@ -1324,6 +1327,9 @@ func _physics_process(delta: float) -> void:
 	cam_rig.rotation.y = cam_yaw
 	spring.rotation.x = cam_pitch
 	rain.position = Vector3(player_node.position.x, 6.0, player_node.position.z)
+	if is_instance_valid(shit_trail):
+		shit_trail.position = player_node.position + Vector3(0, 0.12, 0)
+		shit_trail.emitting = hero_moving and state == "play" and not paused_game
 	if is_instance_valid(lantern):
 		lantern.position = player_node.position + Vector3(0, 2.2, 0)
 		lantern.light_energy = 1.15 + sin(tick * 0.11) * 0.08 + sin(tick * 0.043) * 0.06
@@ -1935,6 +1941,30 @@ func _build_environment() -> void:
 	rain.draw_pass_1 = streak
 	rain.visibility_aabb = AABB(Vector3(-16, -8, -16), Vector3(32, 16, 32))
 	add_child(rain)
+	# hero shit trail: brown lumps drop at the hero's heels and linger behind
+	shit_trail = GPUParticles3D.new()
+	shit_trail.amount = 48
+	shit_trail.lifetime = 1.6
+	shit_trail.local_coords = false
+	var tpm := ParticleProcessMaterial.new()
+	tpm.direction = Vector3(0, 1, 0)
+	tpm.spread = 25.0
+	tpm.initial_velocity_min = 0.2
+	tpm.initial_velocity_max = 0.8
+	tpm.gravity = Vector3(0, -3, 0)
+	tpm.scale_min = 0.7
+	tpm.scale_max = 1.3
+	tpm.color = Color(0.35, 0.22, 0.1)
+	shit_trail.process_material = tpm
+	var turd := BoxMesh.new()
+	turd.size = Vector3(0.16, 0.13, 0.16)
+	var tmat := StandardMaterial3D.new()
+	tmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	tmat.albedo_color = Color(0.35, 0.22, 0.1)
+	turd.material = tmat
+	shit_trail.draw_pass_1 = turd
+	shit_trail.visibility_aabb = AABB(Vector3(-8, -2, -8), Vector3(16, 4, 16))
+	add_child(shit_trail)
 	lantern = OmniLight3D.new()
 	lantern.name = "lantern"
 	lantern.light_color = Color(1.0, 0.85, 0.6)
