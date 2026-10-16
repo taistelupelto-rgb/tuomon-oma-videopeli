@@ -77,6 +77,9 @@ const SFX_DEATH := preload("res://assets/sfx/game_over.ogg")
 const SFX_CHAINED := preload("res://assets/sfx/chained.ogg")
 const SFX_WARDEN := preload("res://assets/sfx/warden_down.ogg")
 const VOICE_TEXT := preload("res://assets/voices/voices_text.gd")
+const MUSIC_STREAM := preload("res://assets/music.mp3")
+const DMG_YELL := preload("res://assets/voices/dmg_yell_01.ogg")
+const ENEMY_LOOK := preload("res://assets/diarra.jpg")
 
 const VOICE_COUNTS := {"room_a": 8, "room_b": 8, "room_c": 8, "room_d": 8,
 	"foe_chase": 8, "foe_dash": 8, "foe_tuhk": 8, "boss_see": 6,
@@ -163,6 +166,8 @@ var pause_label: Label
 var minimap: Control
 var sfx_players: Array = []
 var sfx_i := 0
+var music_player: AudioStreamPlayer
+var dmg_yell_player: AudioStreamPlayer
 var autoplay := false
 var auto_t := 0
 var inventory: Array = [] # slots: {kind, count}. persists rooms, dies on new run.
@@ -813,6 +818,7 @@ func start_run(new_seed: int) -> void:
 	_refresh_overlays()
 	play_sfx(SFX_FIGHT)
 	announce("FIGHT! " + String(LORE_MODS.get(modifier, "")))
+	music_play()
 
 func _load_room(idx: int, keep_chained := true) -> void:
 	ri = idx
@@ -1804,6 +1810,7 @@ func hurt(src: String) -> void:
 	cam_pitch = clampf(cam_pitch + 0.02, CAM_PITCH_MIN, CAM_PITCH_MAX)
 	combo = 0
 	play_sfx(SFX_HURT)
+	damage_yell()
 	if hp <= 0:
 		say("die")
 		state = "dead"
@@ -2166,7 +2173,15 @@ func _build_enemy_node(e: Dictionary) -> void:
 	n.add_child(col)
 	var pair: Array = _enemy_tex(String(e["type"]), bool(e["boss"]))
 	var ekey := "boss" if bool(e["boss"]) else "enemy_" + String(e["type"])
-	var sprite := _sprite3d(_cached_tex(ekey, pair[0], pair[1]), 0.09, 0.8 * scale_f)
+	# every daemon wears the Mother's chosen face (assets/diarra.jpg): the photo as a
+	# billboard, sized to roughly the height the old pixel sprite used
+	var sprite: Sprite3D
+	if ENEMY_LOOK != null:
+		var look: Texture2D = ENEMY_LOOK
+		sprite = _sprite3d(look, 1.4 / float(maxi(1, look.get_height())), 0.7 * scale_f)
+		sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+	else:
+		sprite = _sprite3d(_cached_tex(ekey, pair[0], pair[1]), 0.09, 0.8 * scale_f)
 	sprite.scale = Vector3.ONE * scale_f
 	n.add_child(sprite)
 	var base_mod := Color(1, 1, 1)
@@ -2563,6 +2578,7 @@ func _lore_sightings() -> void:
 
 func show_title() -> void:
 	state = "title"
+	music_stop()
 	_refresh_overlays()
 	hud_room.text = "The hero waits in the dark."
 	hud_cap.text = ""
@@ -2579,6 +2595,34 @@ func _build_audio() -> void:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
 		sfx_players.append(p)
+	# the Indian-song track loops for the whole run
+	music_player = AudioStreamPlayer.new()
+	var music: AudioStream = MUSIC_STREAM
+	if music is AudioStreamMP3:
+		(music as AudioStreamMP3).loop = true
+	elif music is AudioStreamOggVorbis:
+		(music as AudioStreamOggVorbis).loop = true
+	music_player.stream = music
+	music_player.volume_db = -10.0
+	add_child(music_player)
+	# the hero's pain cry: one dedicated voice, replayed on EVERY hit
+	dmg_yell_player = AudioStreamPlayer.new()
+	dmg_yell_player.stream = DMG_YELL
+	dmg_yell_player.volume_db = -4.0
+	add_child(dmg_yell_player)
+
+func music_play() -> void:
+	if music_player != null and not music_player.playing:
+		music_player.play()
+
+func music_stop() -> void:
+	if music_player != null:
+		music_player.stop()
+
+func damage_yell() -> void:
+	if state != "play" or dmg_yell_player == null:
+		return
+	dmg_yell_player.play()
 
 func play_sfx(stream: AudioStream) -> void:
 	var p: AudioStreamPlayer = sfx_players[sfx_i]
