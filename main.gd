@@ -150,6 +150,8 @@ var hud_room: Label
 var hud_combo: Label
 var hud_inv: Label
 var cap_t := 0.0
+var cap_hist: Array = []
+var r_arm_t := 0.0
 var exit_nag_t := 0.0
 var title_panel: PanelContainer
 var dead_panel: PanelContainer
@@ -787,6 +789,7 @@ func start_run(new_seed: int) -> void:
 	voice_cd = 0.0
 	exit_voiced = -1
 	exit_nag_t = 0.0
+	cap_hist.clear()
 	touch_move = Vector2.ZERO
 	touch_slash = false
 	joy_id = -1
@@ -1172,7 +1175,12 @@ func _input(event: InputEvent) -> void:
 				paused_game = false
 				_refresh_overlays()
 		elif k == KEY_R and state == "play":
-			start_run(int(Time.get_unix_time_from_system()) % 100000)
+			if r_arm_t <= 0.0:
+				r_arm_t = 2.0
+				announce("Press R again to abandon run")
+			else:
+				r_arm_t = 0.0
+				start_run(int(Time.get_unix_time_from_system()) % 100000)
 		elif k == KEY_P and state == "play":
 			paused_game = not paused_game
 			_refresh_overlays()
@@ -1299,6 +1307,8 @@ func _physics_process(delta: float) -> void:
 		voice_cd -= delta
 	if exit_nag_t > 0.0:
 		exit_nag_t -= delta
+	if r_arm_t > 0.0:
+		r_arm_t -= delta
 	# --- knife ---
 	var slashing := Input.is_physical_key_pressed(KEY_SPACE) or touch_slash or autoplay
 	if slashing and attack_cd <= 0.0:
@@ -2399,6 +2409,10 @@ func _refresh_hud() -> void:
 		hearts += "H" if i < hp else "-"
 	hud_top.text = "LV %02d  HP %s %d/%d  SCORE %06d  CHAIN %d BEST %06d" % [ri + 1, hearts, hp, max_hp, score, _chained_count(), best_score]
 	hud_combo.text = ("COMBO x%d" % combo) if combo > 1 else ""
+	var _foe := _bot_nearest_foe()
+	if not _foe.is_empty():
+		var _fl := "FOE %s %s/%s" % [str(_foe.get("type", "?")), str(_foe.get("hp", "?")), str(_foe.get("maxhp", "?"))]
+		hud_combo.text = (hud_combo.text + "\n" + _fl) if hud_combo.text != "" else _fl
 	hud_inv.text = _inv_text()
 	if is_instance_valid(joy_knob):
 		var off := joy_vec * 62.0
@@ -2464,7 +2478,10 @@ func show_title() -> void:
 	hud_cap.text = ""
 
 func announce(text: String) -> void:
-	hud_cap.text = text
+	cap_hist.append(text)
+	while cap_hist.size() > 2:
+		cap_hist.remove_at(0)
+	hud_cap.text = "\n".join(cap_hist)
 	cap_t = 5.0
 
 func _build_audio() -> void:
