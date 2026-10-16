@@ -94,6 +94,15 @@ xdg-open bridge-runner.html   # or drag it into a browser
 | `ENTER`   | Start / new run     |
 | `R`       | Reroll the cave     |
 | `P`       | Pause               |
+| left thumb joystick | Move |
+| right thumb drag | Look |
+| `KNIFE` (hold) | Slash |
+| `EAT` | Use melon/heart |
+| `II` | Pause |
+| tap | Start |
+
+Touch: left thumb moves, right thumb drag looks. Hold KNIFE to
+slash, EAT uses melon/heart, II pauses, tap starts.
 
 ```
    GAME OVER? never heard of her.

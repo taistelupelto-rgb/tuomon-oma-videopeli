@@ -1241,7 +1241,7 @@ func _build_hud() -> void:
 	hud_room.offset_left = 12
 	hud_room.offset_top = 34
 	hud_room.offset_right = -12
-	hud_room.add_theme_font_size_override("font_size", 14)
+	hud_room.add_theme_font_size_override("font_size", 16)
 	hud_room.add_theme_color_override("font_color", Color(1, 1, 0))
 	layer.add_child(hud_room)
 	hud_combo = Label.new()
@@ -1249,7 +1249,7 @@ func _build_hud() -> void:
 	hud_combo.offset_left = 12
 	hud_combo.offset_top = 58
 	hud_combo.offset_right = -12
-	hud_combo.add_theme_font_size_override("font_size", 14)
+	hud_combo.add_theme_font_size_override("font_size", 16)
 	hud_combo.add_theme_color_override("font_color", Color(1, 0.6, 0.2))
 	layer.add_child(hud_combo)
 	hud_cap = Label.new()
@@ -1258,7 +1258,7 @@ func _build_hud() -> void:
 	hud_cap.offset_top = 84
 	hud_cap.offset_right = -12
 	hud_cap.offset_bottom = 130
-	hud_cap.add_theme_font_size_override("font_size", 15)
+	hud_cap.add_theme_font_size_override("font_size", 17)
 	hud_cap.add_theme_color_override("font_color", Color(1, 1, 0.4))
 	hud_cap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	layer.add_child(hud_cap)
@@ -1268,7 +1268,7 @@ func _build_hud() -> void:
 	hud_inv.offset_top = -170
 	hud_inv.offset_right = -12
 	hud_inv.offset_bottom = -12
-	hud_inv.add_theme_font_size_override("font_size", 16)
+	hud_inv.add_theme_font_size_override("font_size", 18)
 	hud_inv.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
 	hud_inv.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	layer.add_child(hud_inv)
@@ -1323,12 +1323,17 @@ func _overlay(layer: CanvasLayer, title: String, body: String) -> PanelContainer
 	t.add_theme_color_override("font_color", Color(0.8, 0.2, 0.2))
 	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vb.add_child(t)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(580, 220)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vb.add_child(scroll)
 	var b := Label.new()
 	b.text = body
 	b.add_theme_font_size_override("font_size", 16)
 	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	b.custom_minimum_size = Vector2(580, 200)
-	vb.add_child(b)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.custom_minimum_size = Vector2(560, 0)
+	scroll.add_child(b)
 	var btn := Button.new()
 	btn.text = "TAP TO START / CONTINUE"
 	btn.add_theme_font_size_override("font_size", 22)
