@@ -1302,7 +1302,7 @@ func _build_hud() -> void:
 	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. Left thumb move, right thumb look, KNIFE hold to slash.")
 	dead_panel = _overlay(layer, "YOU DIED", "The cave keeps the knife.\nTap or ENTER for a new cave.")
 	win_panel = _overlay(layer, "ENSLAVED AND DELIVERED!", "A chained tuhkanaama kneels at the glowing exit. The cave releases its master.\n\n" + LORE_OUTRO + "\nTap or ENTER for a new cave.")
-	codex_panel = _overlay(layer, "THE CAVE REMEMBERS", _codex_text())
+	codex_panel = _overlay(layer, "THE CAVE REMEMBERS", _codex_text(), "CLOSE")
 	pause_label = Label.new()
 	pause_label.text = "PAUSED — TAP, ENTER or P to resume"
 	pause_label.set_anchors_preset(Control.PRESET_CENTER)
@@ -1315,7 +1315,7 @@ func _build_hud() -> void:
 	layer.add_child(pause_label)
 	_build_touch()
 
-func _overlay(layer: CanvasLayer, title: String, body: String) -> PanelContainer:
+func _overlay(layer: CanvasLayer, title: String, body: String, btn_text: String = "TAP TO START / CONTINUE") -> PanelContainer:
 	var pc := PanelContainer.new()
 	pc.set_anchors_preset(Control.PRESET_CENTER)
 	pc.offset_left = -310
@@ -1343,7 +1343,7 @@ func _overlay(layer: CanvasLayer, title: String, body: String) -> PanelContainer
 	b.custom_minimum_size = Vector2(560, 0)
 	scroll.add_child(b)
 	var btn := Button.new()
-	btn.text = "TAP TO START / CONTINUE"
+	btn.text = btn_text
 	btn.add_theme_font_size_override("font_size", 22)
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.pressed.connect(_on_overlay_button)
@@ -1358,6 +1358,9 @@ func _on_overlay_button() -> void:
 	elif state == "play" and paused_game:
 		paused_game = false
 		_refresh_overlays()
+	else:
+		if is_instance_valid(codex_panel):
+			codex_panel.visible = false
 
 func _build_touch() -> void:
 	touch_layer = CanvasLayer.new()
