@@ -17,7 +17,7 @@
 <div id="cap">loading...</div>
 <canvas id="g" width="640" height="400"></canvas>
 <p class="help">WASD / arrows: crawl &nbsp;|&nbsp; HOLD SPACE: keep Mom’s knife out and steer it by facing &nbsp;|&nbsp; ENTER: new run &nbsp;|&nbsp; R: reroll cave<br>
-Roguelike rooms, not levels: a new seeded cave every run, permadeath, hearts, whetstones, chasers and dashers. Green Worms-style hero. No tears, only knife.</p>
+Roguelike rooms, not levels: a new seeded cave every run, run modifiers, elites with loot, spike hazards, permadeath. Hearts heal, whetstones sharpen, boots quicken. Green Worms-style hero. No tears, only knife.</p>
 <script>
 "use strict";
 const cv = document.getElementById("g"), ctx = cv.getContext("2d");
@@ -40,16 +40,16 @@ function rint(a, b) { return a + ((R() * (b - a + 1)) | 0); }
 const ROOM_DEFS = [
   { name: "ROOM A — SPAWN CAVE",
     about: "You spawn in a cave with only a knife. Jaska types '?ask ...' in Telegram. Eat the crystal, walk east. Every run, a new cave.",
-    rocks: 1, crys: 1, en: 0, heart: false, sharp: false },
+    rocks: 1, crys: 1, en: 0, spikes: 0, elites: 0, heart: false, sharp: false },
   { name: "ROOM B — THE BRIDGE",
     about: "The bridge bot polls Telegram and forwards the message into this machine. Timeout daemons guard the pipe. Keep the knife out and steer it by facing.",
-    rocks: 2, crys: 2, en: 2, heart: true, sharp: false },
+    rocks: 2, crys: 2, en: 2, spikes: 2, elites: 1, heart: true, sharp: false },
   { name: "ROOM C — THE AGENT THINKS",
     about: "The agent wakes up. It cannot guess: crystals are context it must READ, the knife is the shell it must RUN. Clear the room.",
-    rocks: 3, crys: 2, en: 3, heart: true, sharp: true },
+    rocks: 3, crys: 2, en: 3, spikes: 3, elites: 1, heart: true, sharp: true },
   { name: "ROOM D — DELIVERY",
     about: "Answer ready. Carry it to the PHONE gate and post it back into the Telegram chat. Last daemons. The knife is hungry.",
-    rocks: 2, crys: 1, en: 2, heart: false, sharp: false }
+    rocks: 2, crys: 1, en: 2, spikes: 2, elites: 1, heart: false, sharp: false }
 ];
 const SPAWN = [60, 200];
 const GOAL = [560, 182, 36, 36];
@@ -75,19 +75,27 @@ function genRooms() {
       const p = freeSpot(taken, 110); taken.push(p);
       rocks.push([p.x - 15, p.y - 15, 30, 30]);
     }
+    const spikes = [];
+    for (let k = 0; k < def.spikes; k++) {
+      const p = freeSpot(taken, 110); taken.push(p);
+      spikes.push([p.x - 10, p.y - 10, 20, 20]);
+    }
     const items = [];
-    for (let k = 0; k < def.crys; k++) {
+    const ncrys = def.crys + (modifier === "RICH" ? 1 : 0);
+    for (let k = 0; k < ncrys; k++) {
       const p = freeSpot(taken, 60); taken.push(p);
       items.push([p.x, p.y]);
     }
     const enemies = [];
-    for (let k = 0; k < def.en; k++) {
+    const nen = def.en + ((modifier === "SWARM" && def.en > 0) ? 1 : 0);
+    for (let k = 0; k < nen; k++) {
       const p = freeSpot(taken, 150); taken.push(p);
       const type = R() < 0.32 ? "dash" : "chase";
-      enemies.push({x:p.x, y:p.y, sp:0.9 + R() * 0.4 + i * 0.12, type:type});
+      const fast = (modifier === "SWIFT" ? 0.25 : 0) + (modifier === "RICH" ? 0.15 : 0);
+      enemies.push({x:p.x, y:p.y, sp:0.9 + R() * 0.4 + i * 0.12 + fast, type:type, elite: k < def.elites});
     }
     const extras = [];
-    if (def.heart && R() < 0.5) {
+    if (def.heart && modifier !== "FAMINE" && R() < 0.5) {
       const p = freeSpot(taken, 60); taken.push(p);
       extras.push({x:p.x, y:p.y, kind:"heart", taken:false});
     }
@@ -95,8 +103,12 @@ function genRooms() {
       const p = freeSpot(taken, 60); taken.push(p);
       extras.push({x:p.x, y:p.y, kind:"sharp", taken:false});
     }
+    if ((i === 1 || i === 2) && R() < 0.5) {
+      const p = freeSpot(taken, 60); taken.push(p);
+      extras.push({x:p.x, y:p.y, kind:"boots", taken:false});
+    }
     return {name:def.name, about:def.about, spawn:SPAWN.slice(),
-            rocks:rocks, items:items, enemies:enemies, extras:extras,
+            rocks:rocks, spikes:spikes, items:items, enemies:enemies, extras:extras,
             goal: i === 3 ? GOAL.slice() : null};
   });
 }
@@ -108,7 +120,9 @@ let seed = 1, runStart = 0;
 let ri = 0, px = 0, py = 0, hp = 3, iframes = 0, kills = 0;
 let fx = 1, fy = 0;
 let knife = {ext:14, x:0, y:0, dx:1, dy:0};
-let knifeBonus = 0, knifeDmg = 1;
+let knifeBonus = 0, knifeDmg = 1, speedBonus = 0;
+let modifier = "NONE", visited = [false, false, false, false];
+const MODIFIERS = ["NONE", "NONE", "SWARM", "SWIFT", "FAMINE", "RICH"];
 let keys = {};
 let cur = null;
 
@@ -134,22 +148,30 @@ function loadRoom(i) {
   const Rm = ROOMS[i];
   cur = {
     items: Rm.items.map(p => ({x:p[0], y:p[1], taken:false})),
-    enemies: Rm.enemies.map(e => ({x:e.x, y:e.y, w:16, h:16, hp:2, sp:e.sp,
-      type:e.type, mode:"drift", t:60, vx:0, vy:0, dead:false, cool:0})),
-    extras: Rm.extras.map(e => ({x:e.x, y:e.y, kind:e.kind, taken:false}))
+    enemies: Rm.enemies.map(e => {
+      const big = !!e.elite, size = big ? 22 : 16, hp = big ? 4 : 2;
+      return {x:e.x, y:e.y, w:size, h:size, hp:hp, maxHp:hp, sp:e.sp, elite:big,
+        type:e.type, mode:"drift", t:60, vx:0, vy:0, dead:false, cool:0};
+    }),
+    extras: Rm.extras.map(e => ({x:e.x, y:e.y, kind:e.kind, taken:false})),
+    spikes: Rm.spikes.map(s => ({x:s[0], y:s[1], w:s[2], h:s[3]}))
   };
   px = Rm.spawn[0]; py = Rm.spawn[1];
   fx = 1; fy = 0;
+  visited[i] = true;
   knife = {ext:14, x:px + 21, y:py + 7, dx:1, dy:0};
   iframes = 0;
-  cap.textContent = Rm.name + " — " + Rm.about + "  [seed " + seed + "]";
+  cap.textContent = Rm.name + " — " + Rm.about + "  [seed " + seed + " " + modifier + "]";
 }
 function newRun() {
   seed = getSeed();
   srand(seed);
+  modifier = MODIFIERS[(R() * MODIFIERS.length) | 0];
   genRooms();
   state = "play"; ri = 0; hp = 3; kills = 0;
   knifeBonus = 0; knifeDmg = 1;
+  speedBonus = modifier === "SWIFT" ? 0.4 : 0;
+  visited = [false, false, false, false];
   runStart = Date.now();
   loadRoom(0);
 }
@@ -157,6 +179,15 @@ function runTime() { return ((Date.now() - runStart) / 1000).toFixed(1) + "s"; }
 
 function hit(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+function hurt() {
+  if (iframes > 0 || state !== "play") return;
+  hp--; iframes = 70;
+  if (hp <= 0) {
+    state = "dead";
+    cap.textContent = "YOU DIED in " + ROOMS[ri].name + " at " + runTime() + ", " + kills +
+      " kills  [seed " + seed + " " + modifier + "]. The cave keeps the knife. Press ENTER for a new cave.";
+  }
 }
 function roomClear() {
   return cur.items.every(i => i.taken) && cur.enemies.every(e => e.dead);
@@ -169,7 +200,7 @@ function inDoorGap(y) { return y + 14 > DOOR.y && y < DOOR.y + DOOR.h; }
 function update() {
   if (state !== "play") return;
   const Rm = ROOMS[ri];
-  const sp = 2.6;
+  const sp = 2.6 + speedBonus;
   let vx = 0, vy = 0;
   if (keys["a"] || keys["arrowleft"]) { vx = -sp; fx = -1; fy = 0; }
   if (keys["d"] || keys["arrowright"]) { vx = sp; fx = 1; fy = 0; }
@@ -198,7 +229,11 @@ function update() {
     if (ex.taken || !hit(me, {x:ex.x - 7, y:ex.y - 7, w:14, h:14})) continue;
     ex.taken = true;
     if (ex.kind === "heart") hp = Math.min(3, hp + 1);
+    else if (ex.kind === "boots") speedBonus = Math.min(speedBonus + 0.5, 1.5);
     else { knifeBonus = Math.min(knifeBonus + 10, 30); knifeDmg = 2; }
+  }
+  for (const s of cur.spikes) {
+    if (hit(me, s)) { hurt(); if (state !== "play") return; }
   }
 
   // MOM'S KNIFE: melee blade that stays with the hero.
@@ -224,6 +259,10 @@ function update() {
       if (e.hp <= 0) {
         e.dead = true;
         kills++;
+        if (e.elite && R() < 0.8) {
+          const loot = ["heart", "sharp", "boots"][(R() * 3) | 0];
+          cur.extras.push({x:e.x + 8, y:e.y + 8, kind:loot, taken:false});
+        }
       }
     }
   }
@@ -245,15 +284,7 @@ function update() {
     }
     e.x = Math.max(12, Math.min(W - 28, e.x));
     e.y = Math.max(12, Math.min(H - 28, e.y));
-    if (iframes === 0 && hit(me, e)) {
-      hp--; iframes = 70;
-      if (hp <= 0) {
-        state = "dead";
-        cap.textContent = "YOU DIED in " + Rm.name + " at " + runTime() + ", " + kills +
-          " kills  [seed " + seed + "]. The cave keeps the knife. Press ENTER for a new cave.";
-        return;
-      }
-    }
+    if (hit(me, e)) { hurt(); if (state !== "play") return; }
   }
   if (iframes > 0) iframes--;
 
@@ -262,7 +293,7 @@ function update() {
     if (hit(me, g)) {
       state = "win";
       cap.textContent = WIN_TEXT + " Cleared in " + runTime() + ", " + kills +
-        " kills  [seed " + seed + "]. Press ENTER for a new cave.";
+        " kills  [seed " + seed + " " + modifier + "]. Press ENTER for a new cave.";
     }
   }
 }
@@ -297,7 +328,8 @@ function draw() {
     ctx.fillText("KNIFE OF THE MOTHER", W/2, 150);
     ctx.fillStyle = "#ff0"; ctx.font = "15px monospace";
     ctx.fillText("Roguelike: every run a new cave. Permadeath.", W/2, 190);
-    ctx.fillText("No tears. Only knife.", W/2, 212);
+    ctx.fillText("Modifier each run: SWARM SWIFT FAMINE RICH. Elites drop loot.", W/2, 210);
+    ctx.fillText("No tears. Only knife.", W/2, 232);
     ctx.fillStyle = "#fff";
     ctx.fillText("Press ENTER to spawn", W/2, 260);
     return;
@@ -324,6 +356,14 @@ function draw() {
     ctx.fillStyle = "#2b2b2b"; ctx.fillRect(r[0], r[1], r[2], r[3]);
     ctx.fillStyle = "#555"; ctx.fillRect(r[0], r[1], r[2], 5);
   }
+  for (const s of cur.spikes) {
+    ctx.fillStyle = "#1c1c22"; ctx.fillRect(s.x, s.y, s.w, s.h);
+    ctx.fillStyle = "#999";
+    ctx.beginPath();
+    ctx.moveTo(s.x + 2, s.y + s.h - 3); ctx.lineTo(s.x + 6, s.y + 5); ctx.lineTo(s.x + 10, s.y + s.h - 3);
+    ctx.moveTo(s.x + 10, s.y + s.h - 3); ctx.lineTo(s.x + 14, s.y + 5); ctx.lineTo(s.x + 18, s.y + s.h - 3);
+    ctx.fill();
+  }
   for (const it of cur.items) {
     if (it.taken) continue;
     circle(it.x, it.y, 7, "#073");
@@ -336,6 +376,10 @@ function draw() {
       ctx.fillStyle = "#400"; ctx.fillRect(ex.x - 8, ex.y - 7, 16, 14);
       ctx.fillStyle = "#f00"; ctx.fillRect(ex.x - 6, ex.y - 5, 12, 10);
       ctx.fillStyle = "#fff"; ctx.fillRect(ex.x - 1, ex.y - 3, 3, 6); ctx.fillRect(ex.x - 3, ex.y - 1, 7, 3);
+    } else if (ex.kind === "boots") {
+      ctx.fillStyle = "#4a2c12"; ctx.fillRect(ex.x - 6, ex.y - 6, 8, 12);
+      ctx.fillRect(ex.x - 6, ex.y + 2, 14, 5);
+      ctx.fillStyle = "#c98f4e"; ctx.fillRect(ex.x - 6, ex.y - 6, 8, 3);
     } else {
       ctx.fillStyle = "#ffd700";
       ctx.beginPath();
@@ -353,12 +397,15 @@ function draw() {
   }
   for (const e of cur.enemies) {
     if (e.dead) continue;
-    ctx.fillStyle = e.cool > 0 ? "#fff" : (e.type === "dash" ? "#a0f" : "#f00");
+    ctx.fillStyle = e.cool > 0 ? "#fff" : (e.elite ? "#f80" : (e.type === "dash" ? "#a0f" : "#f00"));
     ctx.fillRect(e.x, e.y, e.w, e.h);
     ctx.fillStyle = "#fff";
     ctx.fillRect(e.x + 3, e.y + 3, 4, 4);
     ctx.fillRect(e.x + 9, e.y + 3, 4, 4);
-    if (e.hp === 1) { ctx.fillStyle = "#000"; ctx.fillRect(e.x + 3, e.y + 11, 10, 2); }
+    if (e.hp < e.maxHp) {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(e.x + 3, e.y + e.h - 5, Math.max(2, (e.w - 6) * e.hp / e.maxHp), 2);
+    }
   }
   const cx = px + 7, cy = py + 7;
   if (!(iframes > 0 && (iframes % 8) < 4)) {
@@ -414,8 +461,12 @@ function draw() {
     ctx.fillStyle = h < hp ? "#f00" : "#400";
     ctx.fillRect(16 + h * 22, 36, 16, 14);
   }
+  for (let m = 0; m < ROOMS.length; m++) {
+    ctx.fillStyle = m === ri ? "#0f0" : (visited[m] ? "#274d27" : "#1c1c22");
+    ctx.fillRect(W - 128 + m * 26, 36, 22, 14);
+  }
   ctx.fillStyle = "#fff"; ctx.font = "12px monospace"; ctx.textAlign = "left";
-  ctx.fillText(Rm.name + "  [seed " + seed + "]  kills " + kills, 16, 28);
+  ctx.fillText(Rm.name + "  [seed " + seed + " " + modifier + "]  kills " + kills, 16, 28);
 }
 
 cap.textContent = "Press ENTER. Every run, a new cave. No tears. Only knife.";
