@@ -99,6 +99,8 @@ xdg-open bridge-runner.html   # or drag it into a browser
 | `KNIFE` (hold) | Slash |
 | `EAT` | Use melon/heart |
 | `II` | Pause |
+| `?` | Codex |
+| `NEW` | Restart (when paused) |
 | tap | Start |
 
 Touch: left thumb moves, right thumb drag looks. Hold KNIFE to

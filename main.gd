@@ -366,6 +366,8 @@ func _input(event: InputEvent) -> void:
 			if state == "play" and not paused_game and pos.x < vp.x * 0.45 and pos.y > vp.y * 0.4 and joy_id == -1:
 				joy_id = event.index
 				joy_origin = pos
+				if is_instance_valid(joy_base):
+					joy_base.position = joy_origin - joy_base.size * 0.5
 				joy_vec = Vector2.ZERO
 				touch_move = Vector2.ZERO
 			elif look_id == -1 and not on_buttons and pos.x > vp.x * 0.45:
@@ -376,6 +378,12 @@ func _input(event: InputEvent) -> void:
 				joy_id = -1
 				joy_vec = Vector2.ZERO
 				touch_move = Vector2.ZERO
+				if is_instance_valid(joy_base):
+					joy_base.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+					joy_base.offset_left = 24
+					joy_base.offset_top = -244
+					joy_base.offset_right = 244
+					joy_base.offset_bottom = -24
 			if event.index == look_id:
 				look_id = -1
 		return
@@ -1256,7 +1264,7 @@ func _build_hud() -> void:
 	hud_cap.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	hud_cap.offset_left = 12
 	hud_cap.offset_top = 84
-	hud_cap.offset_right = -12
+	hud_cap.offset_right = -200
 	hud_cap.offset_bottom = 130
 	hud_cap.add_theme_font_size_override("font_size", 17)
 	hud_cap.add_theme_color_override("font_color", Color(1, 1, 0.4))
@@ -1266,7 +1274,7 @@ func _build_hud() -> void:
 	hud_inv.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	hud_inv.offset_left = 12
 	hud_inv.offset_top = -170
-	hud_inv.offset_right = -12
+	hud_inv.offset_right = -170
 	hud_inv.offset_bottom = -12
 	hud_inv.add_theme_font_size_override("font_size", 18)
 	hud_inv.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
