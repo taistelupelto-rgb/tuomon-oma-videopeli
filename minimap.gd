@@ -31,3 +31,11 @@ func _draw() -> void:
 		var dx: float = -sin(game.yaw) * 8.0
 		var dz: float = -cos(game.yaw) * 8.0
 		draw_rect(Rect2(Vector2(px + dx - 1, py + dz - 1), Vector2(2, 2)), Color(0, 1, 0))
+	for e in game.enemies:
+		if e["dead"]:
+			continue
+		var ep: Vector3 = (e["node"] as Node3D).position
+		var ex: float = 4 + ep.x / game.CELL * cell
+		var ey: float = 4 + ep.z / game.CELL * cell
+		var dc: Color = Color(1.0, 0.84, 0.0) if e.get("enslaved", false) else Color(0.7, 0.15, 0.15)
+		draw_rect(Rect2(Vector2(ex - 1, ey - 1), Vector2(2, 2)), dc)

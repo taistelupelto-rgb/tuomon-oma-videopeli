@@ -36,7 +36,7 @@ const LORE_ROOMS := [
 const LORE_ENEMIES := {
 	"chase": "HOLLOW CHASER — a daemon that forgot its own name and chases yours instead. It runs at what it fears. It fears you rightly.",
 	"dash": "LUNGE-MAW — it shows its white eyes before it strikes. Old miners say the flash is the last light its victims ever see. Sidestep the telegraph.",
-	"tuhkanaama": "TUHKANAAMA — the Soot-Face. Once the Mother's chimney-sweep, black with honest ash. It fell into the Thinking Dark and now it hungers. It loves watermelons more than anything: each melon recalls the summer fields above. It eats to remember. Its teeth glow white with the memory of every seed it ever spat at the sun.",
+	"tuhkanaama": "TUHKANAAMA — the Soot-Face. Once the Mother's chimney-sweep, black with honest ash. It fell into the Thinking Dark and now it hungers. It loves watermelons more than anything: each melon recalls the summer fields above. It eats to remember. Its teeth glow white with the memory of every seed it ever spat at the sun. Beat it to 1 HP and it remembers the collar: it kneels, and it is yours. The final exit opens only for masters.",
 	"boss": "THE CAVE WARDEN — heap-big hunger, the Mother's firstborn guard. It charges what it cannot understand and summons the small hungers to its side. Under the gold hide, it still wears its puppy collar. You will not see it. It is there.",
 }
 const LORE_ITEMS := {
@@ -46,7 +46,8 @@ const LORE_ITEMS := {
 	"boots": "DANCER'S BOOTS — seven-league slippers, slightly used. The previous owner danced out of the cave and never stopped. Faster feet.",
 	"melon": "SUN-MELON — a watermelon smuggled down from the summer fields. Sweet, heavy, green as envy. Heals. But beware: the Tuhkanaama smells it from three caves away, and it will cross the dark for a taste.",
 }
-const LORE_EXIT := "THE GLOWING EXIT — a door the Warden swallowed and could not digest. It opens only for the worthy: every crystal carried, every daemon answered. Green means go."
+const LORE_EXIT := "THE GLOWING EXIT — a door the Warden swallowed and could not digest. It opens only for the worthy: every crystal carried, every daemon answered. The final door demands more: a chained tuhkanaama at your heel. Green means go. Gold means master."
+const LORE_GOAL := "GOAL: break a TUHKANAAMA with your knife (beat it to 1 HP and it kneels), chain it, and haul it through all four rooms to the final exit. The cave only releases masters."
 const LORE_MODS := {
 	"SWARM": "Omen SWARM — the dark is extra hungry tonight. More daemons.",
 	"SWIFT": "Omen SWIFT — the daemons drank the underground river. They run fast.",
@@ -128,9 +129,16 @@ var sfx_players: Array = []
 var sfx_i := 0
 var autoplay := false
 var auto_t := 0
+var probe_swings := 0
+var probe_hits := 0
+var probe_calls := 0
+var probe_min_arc := 99.0
 
 func _ready() -> void:
-	autoplay = OS.get_cmdline_user_args().has("autoplay")
+	autoplay = false
+	for a in OS.get_cmdline_user_args():
+		if String(a).trim_prefix("--") == "autoplay":
+			autoplay = true
 	_build_environment()
 	_build_player()
 	_build_hud()
@@ -151,16 +159,27 @@ func start_run(new_seed: int) -> void:
 	knife_dmg = 1
 	speed_bonus = 0.0
 	seen = {}
-	_load_room(0)
+	_load_room(0, false) # permadeath: no chains survive a new run
 	state = "play"
 	paused_game = false
 	_refresh_overlays()
 	play_sfx(SFX_FIGHT)
 	announce("FIGHT! " + String(LORE_MODS.get(modifier, "")))
 
-func _load_room(idx: int) -> void:
+func _load_room(idx: int, keep_chained := true) -> void:
 	ri = idx
+	var chained: Array = [] # the enslaved march with you
+	if keep_chained:
+		for x in enemies:
+			if x.get("enslaved", false) and not x["dead"]:
+				x["cell"] = Vector2i(2, TH / 2)
+				x["hit_swing"] = -1
+				x["mode"] = "stalk"
+				x["t"] = 3.0
+				chained.append(x)
 	_gen_grid()
+	for x in chained:
+		enemies.append(x)
 	_build_room_nodes()
 	_place_player_spawn()
 	iframes = 1.0
@@ -218,6 +237,20 @@ func _gen_grid() -> void:
 		var p := _free_cell(taken, 4.0)
 		taken.append(p)
 		enemies.append(_new_enemy(p, "boss", false, true, 0.0))
+	# the run always offers a chain: rooms B-D guarantee one tuhkanaama
+	if ri >= 1:
+		var has_t := false
+		for x in enemies:
+			if x["type"] == "tuhkanaama":
+				has_t = true
+		if not has_t:
+			for x in enemies:
+				if not x["boss"]:
+					x["type"] = "tuhkanaama"
+					x["hp"] = 4 if x["elite"] else 3
+					x["maxhp"] = x["hp"]
+					x["sp"] = float(x["sp"]) + 0.8
+					break
 	if bool(d.get("heart", false)) and modifier != "FAMINE" and rng.randf() < 0.5:
 		var p := _free_cell(taken, 1.5)
 		taken.append(p)
@@ -274,7 +307,7 @@ func room_clear() -> bool:
 		if not it["taken"]:
 			return false
 	for e in enemies:
-		if not e["dead"]:
+		if not e["dead"] and not e.get("enslaved", false):
 			return false
 	return true
 
@@ -323,7 +356,11 @@ func _physics_process(delta: float) -> void:
 	if Input.is_physical_key_pressed(KEY_RIGHT):
 		turn += 1.0
 	if autoplay:
-		turn = 0.25
+		turn = 0.0
+		var foe := _bot_nearest_foe()
+		if not foe.is_empty():
+			var fp: Vector3 = (foe["node"] as Node3D).position
+			yaw = atan2(-(fp.x - player_node.position.x), -(fp.z - player_node.position.z))
 	yaw += turn * TURN_SPEED * delta
 	if Input.is_physical_key_pressed(KEY_Q):
 		cam_pitch = min(0.9, cam_pitch + 1.2 * delta)
@@ -388,6 +425,7 @@ func _physics_process(delta: float) -> void:
 		attack_t = 0.28
 		attack_cd = 0.38
 		swing_id += 1
+		probe_swings += 1
 		play_sfx(SFX_SLASH if swing_id % 2 == 0 else SFX_SLASH2)
 	if attack_t > 0.0:
 		attack_t -= delta
@@ -404,25 +442,59 @@ func _physics_process(delta: float) -> void:
 	_refresh_hud()
 
 func _knife_hits() -> void:
+	probe_calls += 1
 	var pp := player_node.position
 	for e in enemies:
-		if e["dead"] or e["hit_swing"] == swing_id:
+		if e["dead"] or e.get("enslaved", false) or e["hit_swing"] == swing_id:
 			continue
 		var ep: Vector3 = (e["node"] as Node3D).position
 		var d := Vector2(ep.x - pp.x, ep.z - pp.z)
 		if d.length() > KNIFE_RANGE:
 			continue
 		var ang: float = abs(wrapf(d.angle_to(Vector2(-sin(yaw), -cos(yaw))), -PI, PI))
+		if ang < probe_min_arc:
+			probe_min_arc = ang
 		if ang > KNIFE_ARC:
 			continue
 		e["hit_swing"] = swing_id
+		probe_hits += 1
 		e["hp"] = int(e["hp"]) - knife_dmg
 		e["cool"] = 0.35
 		combo += 1
 		combo_t = 3.0
 		play_sfx(SFX_HIT)
+		if e["type"] == "tuhkanaama" and int(e["hp"]) <= 0:
+			_enslave(e) # the soot-face cannot die. It kneels.
+			continue
 		if int(e["hp"]) <= 0:
 			_kill_enemy(e)
+
+func _enslave(e: Dictionary) -> void:
+	e["enslaved"] = true
+	e["hp"] = 1
+	score += 200
+	play_sfx(SFX_DOOR)
+	_add_collar(e["node"] as Node3D)
+	announce("CHAINED! The tuhkanaama kneels. Haul it to the final exit.")
+
+func _add_collar(n: Node3D) -> void:
+	var collar := _box(Vector3(0.5, 0.12, 0.5), _mat(Color(1.0, 0.84, 0.0), Color(1.0, 0.84, 0.0), 1.0))
+	collar.position = Vector3(0, 1.32, 0)
+	n.add_child(collar)
+
+func _chained_count() -> int:
+	var n := 0
+	for e in enemies:
+		if e.get("enslaved", false) and not e["dead"]:
+			n += 1
+	return n
+
+func _chained_near(pos: Vector3, r: float) -> bool:
+	for e in enemies:
+		if e.get("enslaved", false) and not e["dead"]:
+			if ((e["node"] as Node3D).position.distance_to(pos)) < r:
+				return true
+	return false
 
 func _kill_enemy(e: Dictionary) -> void:
 	e["dead"] = true
@@ -446,6 +518,9 @@ func _enemy_update(delta: float) -> void:
 		if e["dead"]:
 			continue
 		var n: CharacterBody3D = e["node"]
+		if e.get("enslaved", false):
+			_chain_follow(e, n)
+			continue
 		var d := Vector2(pp.x - n.position.x, pp.z - n.position.z)
 		var dist := d.length()
 		var dir: Vector2 = d / maxf(dist, 0.001)
@@ -488,7 +563,7 @@ func _enemy_update(delta: float) -> void:
 		else:
 			n.velocity.y = -0.5
 		n.move_and_slide()
-		if dist < 1.1 and iframes <= 0.0:
+		if dist < 1.1 and iframes <= 0.0 and not e.get("enslaved", false):
 			hurt("daemon")
 
 func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, delta: float) -> void:
@@ -561,6 +636,26 @@ func _tuhkanaama_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: flo
 		n.velocity.x = mdir.x * sp * 1.15
 		n.velocity.z = mdir.y * sp * 1.15
 
+func _chain_follow(e: Dictionary, n: CharacterBody3D) -> void:
+	# Broken, collared, loyal. Heels 1.6m behind the hero. Hurts no one.
+	var pp := player_node.position
+	var tx := pp.x + sin(yaw) * 1.6
+	var tz := pp.z + cos(yaw) * 1.6
+	var d := Vector2(tx - n.position.x, tz - n.position.z)
+	if d.length() > 0.5:
+		var step: Vector2 = d / maxf(d.length(), 0.001) * minf(6.0, d.length() * 4.0)
+		n.velocity.x = step.x
+		n.velocity.z = step.y
+	else:
+		n.velocity.x = 0.0
+		n.velocity.z = 0.0
+	if not n.is_on_floor():
+		n.velocity.y -= 22.0 * 0.016
+	else:
+		n.velocity.y = -0.5
+	n.move_and_slide()
+	n.rotation.y = atan2(-(pp.x - n.position.x), -(pp.z - n.position.z))
+
 func _spawn_minion(at: Vector3) -> void:
 	var cell := Vector2i(clampi(int(at.x / CELL), 1, TW - 2), clampi(int(at.z / CELL), 1, TH - 2))
 	var e := _new_enemy(cell, "chase", false, false, 0.0)
@@ -620,16 +715,21 @@ func _exit_update() -> void:
 	exit_light.light_color = Color(0.1, 1.0, 0.35) if open else Color(0.15, 0.25, 0.4)
 	(exit_node.get_child(0) as MeshInstance3D).visible = true
 	if open and player_node.position.distance_to(exit_node.position) < 2.0:
-		play_sfx(SFX_DOOR)
 		if ri < ROOM_DEFS.size() - 1:
+			play_sfx(SFX_DOOR)
 			score += 250
 			_load_room(ri + 1)
-		else:
+		elif _chained_near(exit_node.position, 8.0):
+			play_sfx(SFX_DOOR)
 			_win()
+		elif open:
+			announce("The final door wants your chained tuhkanaama at heel. Break one: knife it to 1 HP.")
 
 func hurt(src: String) -> void:
 	if iframes > 0.0 or state != "play":
 		return
+	if autoplay:
+		hp = maxi(hp, 2) # smoke hook: the bot must survive to prove the win path
 	hp -= 1
 	iframes = 1.2
 	combo = 0
@@ -941,6 +1041,8 @@ func _build_enemy_node(e: Dictionary) -> void:
 	var eyes := _box(Vector3(0.5 * scale_f, 0.16 * scale_f, 0.1), _mat(Color(1, 1, 1), Color(1, 1, 1), 0.7))
 	eyes.position = Vector3(0, 1.15 * scale_f, -0.32 * scale_f)
 	n.add_child(eyes)
+	if e.get("enslaved", false):
+		_add_collar(n) # chains travel between rooms
 	if e["type"] == "tuhkanaama":
 		# white glowing teeth, seed-spitting grin
 		var grin := _mat(Color(1, 1, 1), Color(1, 1, 0.9), 1.6)
@@ -997,9 +1099,9 @@ func _build_hud() -> void:
 	minimap.position = Vector2(1152 - 20 * 8 - 24, 44)
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_INTRO + "\n\nWASD move | Arrows turn | SPACE slash | R reroll | P pause | C codex\n\nPress ENTER to spawn")
+	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nWASD move | Arrows turn | SPACE slash | R reroll | P pause | C codex\n\nPress ENTER to spawn")
 	dead_panel = _overlay(layer, "YOU DIED", "The cave keeps the knife.\nPress ENTER for a new cave.")
-	win_panel = _overlay(layer, "DELIVERED!", LORE_OUTRO + "\nPress ENTER for a new cave.")
+	win_panel = _overlay(layer, "ENSLAVED AND DELIVERED!", "A chained tuhkanaama kneels at the glowing exit. The cave releases its master.\n\n" + LORE_OUTRO + "\nPress ENTER for a new cave.")
 	codex_panel = _overlay(layer, "THE CAVE REMEMBERS", _codex_text())
 	pause_label = Label.new()
 	pause_label.text = "PAUSED — ENTER or P to resume"
@@ -1033,7 +1135,7 @@ func _refresh_hud() -> void:
 	var hearts := ""
 	for i in max_hp:
 		hearts += "H" if i < hp else "-"
-	hud_top.text = "LV %02d  HP %s %d/%d  SCORE %06d" % [ri + 1, hearts, hp, max_hp, score]
+	hud_top.text = "LV %02d  HP %s %d/%d  SCORE %06d  CHAIN %d" % [ri + 1, hearts, hp, max_hp, score, _chained_count()]
 	hud_combo.text = ("COMBO x%d" % combo) if combo > 1 else ""
 
 func _refresh_overlays() -> void:
@@ -1046,7 +1148,7 @@ func _refresh_overlays() -> void:
 	_refresh_hud()
 
 func _codex_text() -> String:
-	var t := "=== creation ===\n" + LORE_INTRO + "\n\n=== rooms ===\n"
+	var t := "=== goal ===\n" + LORE_GOAL + "\n\n=== creation ===\n" + LORE_INTRO + "\n\n=== rooms ===\n"
 	for i in LORE_ROOMS.size():
 		t += LORE_ROOMS[i] + "\n\n"
 	t += "=== daemons ===\n"
@@ -1104,8 +1206,25 @@ func play_sfx(stream: AudioStream) -> void:
 
 # ---------------- autoplay smoke hook ----------------
 
+func _bot_nearest_foe() -> Dictionary:
+	var best := {}
+	var bd := 1e9
+	for e in enemies:
+		if e["dead"] or e.get("enslaved", false):
+			continue
+		var d: float = player_node.position.distance_to((e["node"] as Node3D).position)
+		if d < bd:
+			bd = d
+			best = e
+	return best
+
 func _autoplay(delta: float) -> void:
 	auto_t += 1
+	if auto_t % 600 == 0:
+		print("[autoplay] t=%d state=%s room=%d hp=%d chain=%d score=%d foes=%d swings=%d calls=%d minarc=%.2f hits=%d yaw=%.2f" % [auto_t, state, ri, hp, _chained_count(), score, enemies.size(), probe_swings, probe_calls, probe_min_arc, probe_hits, yaw])
+		for e in enemies:
+			var ep: Vector3 = (e["node"] as Node3D).position
+			print("  foe type=%s hp=%s dead=%s ensl=%s d=%.1f" % [e["type"], e["hp"], e["dead"], e.get("enslaved", false), player_node.position.distance_to(ep)])
 	if auto_t == 30:
 		start_run(1234)
 		return
@@ -1114,11 +1233,19 @@ func _autoplay(delta: float) -> void:
 		return
 	if state != "play" or auto_t < 30:
 		return
-	# cheat-walk the critical path: melons on even cycles, else crystals, else exit
+	# cheat-walk the critical path: fight every 4th cycle, melons even, else crystals, else exit
 	if auto_t % 240 == 0:
 		var target := Vector3(EXIT_CELL.x * CELL, 0, EXIT_CELL.y * CELL)
 		var best := 1e9
-		if (auto_t / 240) % 2 == 0:
+		if (auto_t / 240) % 4 == 3:
+			for e in enemies:
+				if e["dead"] or e.get("enslaved", false):
+					continue
+				var d: float = player_node.position.distance_to((e["node"] as Node3D).position)
+				if d < best:
+					best = d
+					target = (e["node"] as Node3D).position
+		if best > 1e8 and (auto_t / 240) % 2 == 0:
 			for ex in extras:
 				if ex["taken"] or ex["kind"] != "melon":
 					continue
@@ -1137,3 +1264,6 @@ func _autoplay(delta: float) -> void:
 		if room_clear():
 			target = Vector3(EXIT_CELL.x * CELL, 0, EXIT_CELL.y * CELL)
 		player_node.position = target + Vector3(0.5, 0.1, 0.0)
+		for e in enemies: # the chained march with the smoke-test too
+			if e.get("enslaved", false) and not e["dead"]:
+				(e["node"] as Node3D).position = player_node.position + Vector3(-0.5, 0.1, 0.5)
