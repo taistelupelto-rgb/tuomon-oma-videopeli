@@ -201,7 +201,7 @@ func say(cat: String) -> void:
 	voice_cd = 5.0
 	play_sfx(stream)
 	var sub: String = VOICE_TEXT.LINES.get(f, "")
-	if sub != "":
+	if sub != "" and cap_t <= 1.0:
 		announce(sub)
 
 # ---------------- run / rooms ----------------
