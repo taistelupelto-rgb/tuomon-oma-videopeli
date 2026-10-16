@@ -162,6 +162,7 @@ let visited = [false, false, false, false];
 // 2.5D player: position in tiles, direction + camera plane
 let px = 1.5, py = TH / 2, dirX = 1, dirY = 0, planeX = 0, planeY = 0.66;
 let attackT = 0, attackCd = 0, flash = 0, shake = 0, tick = 0;
+let lastBonk = -99, lastBoing = -99;
 let keys = {};
 let cur = null;
 // touch state
@@ -248,6 +249,138 @@ function fart() {
     src.start(t); trem.start(t); trem.stop(t + dur);
   } catch (e) {}
 }
+// sad trombone: womp womp womp waaaaah
+function wompWomp() {
+  const ac = ensureAC(); if (!ac) return;
+  try {
+    const t = ac.currentTime;
+    const notes = [[311, 0.22], [294, 0.22], [277, 0.22], [220, 0.8]];
+    let at = t;
+    notes.forEach((n, i) => {
+      const f = n[0], dur = n[1];
+      const o = ac.createOscillator(); o.type = "sawtooth";
+      o.frequency.setValueAtTime(f, at);
+      if (i === notes.length - 1) o.frequency.exponentialRampToValueAtTime(196, at + dur);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(0.2, at + 0.04);
+      g.gain.setValueAtTime(0.2, at + dur - 0.08);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      const vib = ac.createOscillator(); vib.frequency.value = 6;
+      const vibG = ac.createGain(); vibG.gain.value = 5;
+      vib.connect(vibG); vibG.connect(o.frequency);
+      const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1400;
+      o.connect(lp); lp.connect(g); g.connect(ac.destination);
+      o.start(at); o.stop(at + dur); vib.start(at); vib.stop(at + dur);
+      at += dur;
+    });
+  } catch (e) {}
+}
+// bonk: skull meets cave wall
+function bonk() {
+  const ac = ensureAC(); if (!ac) return;
+  try {
+    const t = ac.currentTime;
+    const o = ac.createOscillator(); o.type = "sine";
+    o.frequency.setValueAtTime(880, t);
+    o.frequency.exponentialRampToValueAtTime(90, t + 0.18);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.4, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t + 0.22);
+    const len = Math.floor(ac.sampleRate * 0.05);
+    const bfr = ac.createBuffer(1, len, ac.sampleRate);
+    const ch = bfr.getChannelData(0);
+    for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const n = ac.createBufferSource(); n.buffer = bfr;
+    const bp = ac.createBiquadFilter(); bp.type = "bandpass";
+    bp.frequency.value = 1600; bp.Q.value = 2;
+    const ng = ac.createGain(); ng.gain.value = 0.25;
+    n.connect(bp); bp.connect(ng); ng.connect(ac.destination);
+    n.start(t);
+  } catch (e) {}
+}
+// record scratch: pausing the boss fight, bold move
+function recordScratch() {
+  const ac = ensureAC(); if (!ac) return;
+  try {
+    const t = ac.currentTime, dur = 0.35;
+    const len = Math.floor(ac.sampleRate * dur);
+    const bfr = ac.createBuffer(1, len, ac.sampleRate);
+    const ch = bfr.getChannelData(0);
+    for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+    const src = ac.createBufferSource(); src.buffer = bfr;
+    const bp = ac.createBiquadFilter(); bp.type = "bandpass";
+    bp.frequency.value = 2200; bp.Q.value = 1.5;
+    const lfo = ac.createOscillator(); lfo.type = "square"; lfo.frequency.value = 24;
+    const lfoG = ac.createGain(); lfoG.gain.value = 1400;
+    lfo.connect(lfoG); lfoG.connect(bp.frequency);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp); bp.connect(g); g.connect(ac.destination);
+    src.start(t); lfo.start(t); lfo.stop(t + dur);
+  } catch (e) {}
+}
+// oof: budget scream when a daemon punches you
+function oof() {
+  const ac = ensureAC(); if (!ac) return;
+  try {
+    const t = ac.currentTime, dur = 0.28;
+    const o = ac.createOscillator(); o.type = "sawtooth";
+    o.frequency.setValueAtTime(320, t);
+    o.frequency.exponentialRampToValueAtTime(150, t + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    [520, 1100].forEach((f, i) => {
+      const bp = ac.createBiquadFilter(); bp.type = "bandpass";
+      bp.frequency.value = f; bp.Q.value = i ? 6 : 4;
+      const fg = ac.createGain(); fg.gain.value = i ? 0.6 : 1;
+      o.connect(bp); bp.connect(fg); fg.connect(g);
+    });
+    g.connect(ac.destination);
+    o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
+// clown honk: loot acquired, honk honk
+function honk() {
+  const ac = ensureAC(); if (!ac) return;
+  try {
+    const t = ac.currentTime;
+    [0, 0.16].forEach(k => {
+      const at = t + k, dur = 0.14;
+      const o = ac.createOscillator(); o.type = "square";
+      o.frequency.setValueAtTime(520, at);
+      o.frequency.exponentialRampToValueAtTime(300, at + dur);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(0.28, at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      o.connect(g); g.connect(ac.destination);
+      o.start(at); o.stop(at + dur);
+    });
+  } catch (e) {}
+}
+// boing: dash daemon winds up before it lunges
+function boing() {
+  const ac = ensureAC(); if (!ac) return;
+  try {
+    const t = ac.currentTime, dur = 0.3;
+    const o = ac.createOscillator(); o.type = "sine";
+    o.frequency.setValueAtTime(200, t);
+    o.frequency.exponentialRampToValueAtTime(900, t + 0.08);
+    o.frequency.exponentialRampToValueAtTime(250, t + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.35, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
 function getSeed() {
   try {
     const m = /seed=(\d+)/.exec(location.search);
@@ -264,7 +397,7 @@ addEventListener("keydown", e => {
     else if (state !== "play") newRun();
   }
   if (k === "p") {
-    if (state === "play") state = "pause";
+    if (state === "play") { state = "pause"; recordScratch(); }
     else if (state === "pause") state = "play";
   }
   if (k === "r" && state === "play") newRun();
@@ -315,7 +448,7 @@ try {
   const pauseEl = document.getElementById("pauseBtn");
   const togglePause = e => {
     if (e) e.preventDefault();
-    if (state === "play") state = "pause";
+    if (state === "play") { state = "pause"; recordScratch(); }
     else if (state === "pause") state = "play";
   };
   pauseEl.addEventListener("touchstart", togglePause, {passive:false});
@@ -375,10 +508,10 @@ function hurt(src) {
   if (iframes > 0 || state !== "play") return;
   hp--; iframes = 70; flash = 10; shake = 7;
   if (src === "spike") { sfx("spike", 0.5); fart(); }
-  else { sfx("soft", 0.6); }
+  else { sfx("soft", 0.6); oof(); }
   if (hp <= 0) {
     state = "dead";
-    sfx("gameover"); vineBoom();
+    sfx("gameover"); vineBoom(); wompWomp();
     cap.textContent = "YOU DIED in " + ROOMS[ri].name + " at " + runTime() + ", " + kills +
       " kills  [seed " + seed + " " + modifier + "]. The cave keeps the knife. Press ENTER for a new cave.";
   }
@@ -456,8 +589,12 @@ function update() {
   let nx = px + (dirX * fwd + -dirY * strafe) * sp;
   let ny = py + (dirY * fwd + dirX * strafe) * sp;
   const r = 0.2;
+  let bumped = false;
   if (!solidAt(nx + Math.sign(nx - px) * r, py + r) && !solidAt(nx + Math.sign(nx - px) * r, py - r)) px = nx;
+  else if (Math.abs(nx - px) > 1e-6) bumped = true;
   if (!solidAt(px + r, ny + Math.sign(ny - py) * r) && !solidAt(px - r, ny + Math.sign(ny - py) * r)) py = ny;
+  else if (Math.abs(ny - py) > 1e-6) bumped = true;
+  if (bumped && tick - lastBonk > 40) { lastBonk = tick; bonk(); }
   // spike tile
   if (cellAt(px, py) === "s") hurt("spike");
   if (state !== "play") return;
@@ -486,6 +623,7 @@ function update() {
     if (ex.taken || Math.hypot(ex.x - px, ex.y - py) >= 0.7) continue;
     ex.taken = true;
     sfx("pot", 0.45);
+    honk();
     if (ex.kind === "heart") hp = Math.min(3, hp + 1);
     else if (ex.kind === "boots") speedBonus = Math.min(speedBonus + 0.5, 1.5);
     else { knifeBonus = Math.min(knifeBonus + 10, 30); knifeDmg = 2; }
@@ -533,7 +671,10 @@ function update() {
         e.t--;
         if (e.mode === "drift") {
           e.gx += dx / d * e.sp * 0.4; e.gy += dy / d * e.sp * 0.4;
-          if (e.t <= 0) { e.mode = "dash"; e.t = 22; e.vx = dx / d * 0.11; e.vy = dy / d * 0.11; }
+          if (e.t <= 0) {
+            e.mode = "dash"; e.t = 22; e.vx = dx / d * 0.11; e.vy = dy / d * 0.11;
+            if (tick - lastBoing > 30) { lastBoing = tick; boing(); }
+          }
         } else {
           e.gx += e.vx; e.gy += e.vy;
           if (e.t <= 0) { e.mode = "drift"; e.t = 80 + ((R() * 80) | 0); }

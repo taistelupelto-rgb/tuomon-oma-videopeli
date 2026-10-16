@@ -18,7 +18,10 @@ Raw files live in `assets/sfx/`. Packs used:
 - [Impact Sounds](https://kenney.nl/assets/impact-sounds) — punches, metal, bell
 - [Voiceover Pack (Fighter)](https://kenney.nl/assets/voiceover-pack-fighter) — the announcer (FIGHT! FINAL ROUND! YOU WIN!)
 
-Plus synthesized stingers: airhorn (win), vine boom (death), fart (spikes).
+Plus synthesized stingers, all Web Audio, zero extra assets: airhorn (win),
+vine boom (death), fart (spikes), sad trombone womp womp (death), oof
+(enemy punch), bonk (wall bump), honk (loot), boing (dash windup),
+record scratch (pause).
 Unhinged as requested.
 
 ```
