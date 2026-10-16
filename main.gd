@@ -83,6 +83,7 @@ const VOICE_COUNTS := {"room_a": 8, "room_b": 8, "room_c": 8, "room_d": 8,
 	"lowhp": 8, "idle": 16, "exit_need": 6, "exit_open": 4}
 var voice_bank := {}
 var voice_cache := {}
+var tex_cache := {}
 var voice_cd := 0.0
 var exit_voiced := -1
 
@@ -109,11 +110,10 @@ var player_node: CharacterBody3D
 var cam_rig: Node3D
 var spring: SpringArm3D
 var cam: Camera3D
-var body_mesh: MeshInstance3D
-var leg_l: Node3D
-var leg_r: Node3D
-var arm_r: Node3D
-var knife_blade: MeshInstance3D
+var hero_sprite: Sprite3D
+var hero_tex1: Texture2D
+var hero_tex2: Texture2D
+var hero_tex_slash: Texture2D
 var yaw := 0.0
 var cam_pitch := -0.2
 var walk_phase := 0.0
@@ -215,6 +215,297 @@ func say(cat: String) -> void:
 	var sub: String = VOICE_TEXT.LINES.get(f, "")
 	if sub != "" and cap_t <= 1.0:
 		announce(sub)
+
+# ---------------- pixel sprites (hand-made, in code) ----------------
+const HERO_BACK_1 := [
+	"....HHHHHHHH....",
+	"...HHHHHHHHHH...",
+	"...HhHHHHHHhH...",
+	"...HhHHHHHHhH...",
+	"...HHHSSSSHHH...",
+	"....HHHHHHHH....",
+	"....HHHHHHHH....",
+	".....GGGGGG.....",
+	"....GGGGGGGG....",
+	"....GgGGGGgG....",
+	"....GgGGGGgG....",
+	"....GGGGGGGG....",
+	".....GGGGGG.....",
+	".....PPPPPP.....",
+	".....PpPPpP.....",
+	".....PpPPpP.....",
+	"....PP....PP....",
+	"....PP....PP....",
+	"....BB....BB....",
+	"....BB....BB....",
+]
+const HERO_BACK_2 := [
+	"....HHHHHHHH....",
+	"...HHHHHHHHHH...",
+	"...HhHHHHHHhH...",
+	"...HhHHHHHHhH...",
+	"...HHHSSSSHHH...",
+	"....HHHHHHHH....",
+	"....HHHHHHHH....",
+	".....GGGGGG.....",
+	"....GGGGGGGG....",
+	"....GgGGGGgG....",
+	"....GgGGGGgG....",
+	"....GGGGGGGG....",
+	".....GGGGGG.....",
+	".....PPPPPP.....",
+	".....PpPPpP.....",
+	".....PpPPpP.....",
+	"......PPPP......",
+	"......PPPP......",
+	"......PPPP......",
+	"......BBBB......",
+]
+const HERO_SLASH := [
+	"....HHHHHHHH....",
+	"...HHHHHHHHHH...",
+	"...HhHHHHHHhH...",
+	"...HhHHHHHHhH...",
+	"...HHHSSSSHHH...",
+	"....HHHHHHHH..W.",
+	"....HHHHHHHH.WW.",
+	".....GGGGGG.WW..",
+	"....GGGGGGGGWW..",
+	"....GgGGGGgGW...",
+	".KKKGgGGGGgGW...",
+	".KKKKGGGGGGGW...",
+	"..NNGGGGGGGGW...",
+	".....GGGGGG.W...",
+	".....PPPPPP.....",
+	".....PpPPpP.....",
+	".....PpPPpP.....",
+	"....PP....PP....",
+	"....PP....PP....",
+	"....BB....BB....",
+]
+const IMP_CHASE := [
+	"................",
+	".....H....H.....",
+	".....HH..HH.....",
+	".....RRRRRR.....",
+	"....RRRRRRRR....",
+	"....RWRRRRWR....",
+	"....RWRRRRWR....",
+	"....RRRrrRRR....",
+	"....RRWWWWRR....",
+	".....RRRRRR.....",
+	".....RrRRrR.....",
+	"....RRRRRRRR....",
+	"...RRRRRRRRRR...",
+	"...RrR....RrR...",
+	"....RR....RR....",
+	"....BB....BB....",
+]
+const IMP_DASH := [
+	"................",
+	"..........PP....",
+	".........PPPC...",
+	"....P...PPPPP...",
+	".....PPPPPPP....",
+	".....WPPPPPC....",
+	".....WPPPPPP....",
+	"......pppPP.....",
+	"...P..PPPpp.....",
+	"....PPPPPP......",
+	".....PPPP.......",
+	"....PPP.PPP.....",
+	"...PPP...PPP....",
+	"...Pp.....Pp....",
+	"....B.....B.....",
+	"................",
+]
+const TUHK := [
+	"................",
+	"....KKKKKKKK....",
+	"...KKKKKKKKKK...",
+	"...KKWWKKWWKK...",
+	"...KKWWKKWWKK...",
+	"...KKKKKKKKKK...",
+	"....KKKKKKKK....",
+	"....KWWWWWWK....",
+	"....KWKWWKWK....",
+	"....KWWWWWWK....",
+	"....KRKRRKRK....",
+	"....KKKKKKKK....",
+	"...KKkKKKKkKK...",
+	"...KKKKKKKKKK...",
+	"....KKK..KKK....",
+	"....BB....BB....",
+]
+const BOSS := [
+	"................",
+	"....GGGGGGGG....",
+	"...GGGGGGGGGG...",
+	"...GWGGGGGGWG...",
+	"...GWGGGGGGWG...",
+	"...GGGGGGGGGG...",
+	"....GGGGGGGG....",
+	".....CCCCCC.....",
+	"....CCCCCCCC....",
+	"...GGGGGGGGGG...",
+	"...GgGGGGGgGG...",
+	"...GgGGGGGgGG...",
+	"...GGGGGGGGGG...",
+	"...GGGG..GGGG...",
+	"...BB.....BB....",
+	"...BB.....BB....",
+]
+const CRYS := [
+	"................",
+	".......CC.......",
+	"......CCCW......",
+	".....CCCCW......",
+	".....CcCCW......",
+	"....CCcCCCW.....",
+	"....CcCCCCC.....",
+	"...CCcCCCCWC....",
+	"...CcCCCCCC.....",
+	"....CcCCCC......",
+	"....CCcCC.......",
+	".....CCC........",
+	"......C.........",
+	"................",
+	"................",
+	"................",
+]
+const HEART := [
+	"................",
+	"................",
+	"...HHH..HHH.....",
+	"..HWHH..HHHH....",
+	"..HWHHHHHHHH....",
+	"..HHHHHHHHHH....",
+	"..HhHHHHHHH.....",
+	"...hHHHHHH......",
+	"....HHHHH.......",
+	".....HHH........",
+	"......H.........",
+	"................",
+	"................",
+	"................",
+	"................",
+	"................",
+]
+const SHARP := [
+	"................",
+	"................",
+	"................",
+	".....GGGGGG.....",
+	"....GGGGGGWG....",
+	"....GgGGGGGG....",
+	"....GGgGGGgG....",
+	"....GGGGGGGG....",
+	".....gggggg.....",
+	".....BBBBBB.....",
+	".....BBBBBB.....",
+	"................",
+	"................",
+	"................",
+	"................",
+	"................",
+]
+const BOOTS := [
+	"................",
+	"................",
+	"................",
+	"................",
+	"....BB...BB.....",
+	"....BBW..BBW....",
+	"....BB...BB.....",
+	"....BBb..BBb....",
+	"....BBb..BBb....",
+	"....BBBBBBBB....",
+	"....BBBBBBBB....",
+	"....bbbbbbbb....",
+	"................",
+	"................",
+	"................",
+	"................",
+]
+const MELON := [
+	"................",
+	"................",
+	"................",
+	".....ggggg......",
+	"....gGgGgGgW....",
+	"...gGgGgGgGg....",
+	"...gGgGgGgGgW...",
+	"...gGgGgGgGg....",
+	"...gGgGgGgGg....",
+	"....gGgGgGg.....",
+	".....ggggg......",
+	"................",
+	"................",
+	"................",
+	"................",
+	"................",
+]
+
+func _pixel_tex(rows: Array, pal: Dictionary) -> ImageTexture:
+	var h := rows.size()
+	var w: int = (rows[0] as String).length()
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	for y in h:
+		var row: String = rows[y]
+		for x in w:
+			var ch := row.substr(x, 1)
+			img.set_pixel(x, y, pal.get(ch, Color(0, 0, 0, 0)))
+	var tex := ImageTexture.create_from_image(img)
+	return tex
+
+func _cached_tex(key: String, rows: Array, pal: Dictionary) -> ImageTexture:
+	var t = tex_cache.get(key)
+	if t != null:
+		return t
+	t = _pixel_tex(rows, pal)
+	tex_cache[key] = t
+	return t
+
+func _hero_pal() -> Dictionary:
+	return {
+		"H": Color(1.0, 0.62, 0.72), "h": Color(0.78, 0.38, 0.52),
+		"S": Color(1.0, 0.89, 0.78),
+		"G": Color(0.16, 0.62, 0.56), "g": Color(0.09, 0.42, 0.38),
+		"P": Color(0.25, 0.25, 0.38), "p": Color(0.15, 0.15, 0.24),
+		"B": Color(0.35, 0.22, 0.12),
+		"K": Color(0.85, 0.88, 0.95), "N": Color(0.35, 0.23, 0.11),
+		"W": Color(1, 1, 1),
+	}
+
+func _sprite3d(tex: Texture2D, pixel_size: float, y: float) -> Sprite3D:
+	var s := Sprite3D.new()
+	s.texture = tex
+	s.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	s.shaded = false
+	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	s.pixel_size = pixel_size
+	s.position = Vector3(0, y, 0)
+	return s
+
+func _enemy_tex(etype: String, boss: bool) -> Array:
+	if boss:
+		return [BOSS, {"G": Color(1.0, 0.75, 0.15), "g": Color(0.6, 0.4, 0.08), "W": Color(1, 1, 1), "C": Color(0.8, 0.1, 0.1), "B": Color(0.15, 0.1, 0.08)}]
+	if etype == "dash":
+		return [IMP_DASH, {"P": Color(0.63, 0.15, 0.95), "p": Color(0.35, 0.05, 0.55), "W": Color(1, 1, 1), "C": Color(0.4, 0.9, 1.0), "B": Color(0.12, 0.08, 0.14)}]
+	if etype == "tuhkanaama":
+		return [TUHK, {"K": Color(0.07, 0.07, 0.09), "k": Color(0.16, 0.15, 0.17), "W": Color(1, 1, 1), "R": Color(0.5, 0.08, 0.06), "B": Color(0.05, 0.05, 0.06)}]
+	return [IMP_CHASE, {"R": Color(0.85, 0.15, 0.12), "r": Color(0.5, 0.08, 0.08), "H": Color(1.0, 0.85, 0.4), "W": Color(1, 1, 1), "B": Color(0.15, 0.1, 0.12)}]
+
+func _item_tex(kind: String) -> Array:
+	if kind == "heart":
+		return [HEART, {"H": Color(0.9, 0.1, 0.15), "h": Color(0.5, 0.05, 0.08), "W": Color(1, 1, 1)}]
+	if kind == "sharp":
+		return [SHARP, {"G": Color(0.95, 0.78, 0.3), "g": Color(0.55, 0.42, 0.15), "W": Color(1, 1, 1), "B": Color(0.3, 0.2, 0.1)}]
+	if kind == "boots":
+		return [BOOTS, {"B": Color(0.45, 0.28, 0.12), "b": Color(0.25, 0.15, 0.06), "W": Color(0.9, 0.85, 0.7)}]
+	if kind == "melon":
+		return [MELON, {"G": Color(0.05, 0.45, 0.15), "g": Color(0.3, 0.75, 0.3), "W": Color(0.9, 1.0, 0.9)}]
+	return [CRYS, {"C": Color(0.1, 0.85, 0.4), "c": Color(0.03, 0.4, 0.18), "W": Color(0.9, 1.0, 0.95)}]
 
 # ---------------- run / rooms ----------------
 
@@ -563,8 +854,6 @@ func _physics_process(delta: float) -> void:
 	var moving := mag > 0.1
 	if moving:
 		walk_phase += 9.0 * delta
-	leg_l.rotation.x = sin(walk_phase) * (0.7 if moving else 0.0)
-	leg_r.rotation.x = -sin(walk_phase) * (0.7 if moving else 0.0)
 	# --- camera rig follows ---
 	cam_rig.position = cam_rig.position.lerp(player_node.position + Vector3(0, 1.7, 0), 0.35)
 	cam_rig.rotation.y = yaw
@@ -593,13 +882,22 @@ func _physics_process(delta: float) -> void:
 		play_sfx(SFX_SLASH if swing_id % 2 == 0 else SFX_SLASH2)
 	if attack_t > 0.0:
 		attack_t -= delta
-		arm_r.rotation.x = -1.9 + (0.28 - attack_t) / 0.28 * 1.4
+		hero_sprite.texture = hero_tex_slash
 		_knife_hits()
 	else:
-		arm_r.rotation.x = lerpf(arm_r.rotation.x, 0.0, 0.2)
+		if moving:
+			hero_sprite.texture = hero_tex1 if int(walk_phase * 2.0) % 2 == 0 else hero_tex2
+		else:
+			hero_sprite.texture = hero_tex1
 	# --- enemies, pickups, exit, spikes ---
 	_enemy_update(delta)
 	_pickup_update()
+	for it in items:
+		if not it["taken"] and is_instance_valid(it["node"] as Node3D):
+			(it["node"] as Node3D).position.y = 0.9 + sin(tick * 0.06 + (it["pos"] as Vector3).x * 2.0) * 0.08
+	for ex in extras:
+		if not ex["taken"] and is_instance_valid(ex["node"] as Node3D):
+			(ex["node"] as Node3D).position.y = 0.9 + sin(tick * 0.06 + (ex["pos"] as Vector3).x * 2.0) * 0.08
 	_spike_update()
 	_exit_update()
 	_lore_sightings()
@@ -714,13 +1012,13 @@ func _enemy_update(delta: float) -> void:
 			elif e["mode"] == "tele":
 				n.velocity.x = 0.0
 				n.velocity.z = 0.0
-				e["mat"].emission_enabled = true
+				(e["sprite"] as Sprite3D).modulate = Color(3, 3, 3)
 				if e["t"] <= 0.0:
 					e["mode"] = "lunge"
 					e["t"] = 0.45
 					e["vx"] = dir.x * sp * 3.2
 					e["vz"] = dir.y * sp * 3.2
-					e["mat"].emission_enabled = false
+					(e["sprite"] as Sprite3D).modulate = e["base_mod"]
 			else:
 				n.velocity.x = float(e["vx"])
 				n.velocity.z = float(e["vz"])
@@ -749,13 +1047,13 @@ func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, de
 	elif e["mode"] == "tele":
 		n.velocity.x = 0.0
 		n.velocity.z = 0.0
-		e["mat"].emission_enabled = true
+		(e["sprite"] as Sprite3D).modulate = Color(3, 3, 3)
 		if e["t"] <= 0.0:
 			e["mode"] = "charge"
 			e["t"] = 0.8
 			e["vx"] = dir.x * 9.0
 			e["vz"] = dir.y * 9.0
-			e["mat"].emission_enabled = false
+			(e["sprite"] as Sprite3D).modulate = e["base_mod"]
 	else:
 		n.velocity.x = float(e["vx"])
 		n.velocity.z = float(e["vz"])
@@ -1083,69 +1381,15 @@ func _build_player() -> void:
 	col.shape = cap
 	col.position = Vector3(0, 0.85, 0)
 	player_node.add_child(col)
-	var skin := _mat(Color(1.0, 0.89, 0.78))
-	var hoodie := _mat(Color(0.16, 0.62, 0.56))
-	var hair_m := _mat(Color(1.0, 0.7, 0.78))
-	var hair_d := _mat(Color(0.88, 0.5, 0.64))
-	var shoe_m := _mat(Color(0.23, 0.16, 0.23))
-	body_mesh = MeshInstance3D.new()
-	var torso := CapsuleMesh.new()
-	torso.radius = 0.34
-	torso.height = 1.0
-	torso.material = hoodie
-	body_mesh.mesh = torso
-	body_mesh.position = Vector3(0, 1.05, 0)
-	player_node.add_child(body_mesh)
-	# head + hair + ears (back view: hair covers)
-	var head := MeshInstance3D.new()
-	var hs := SphereMesh.new()
-	hs.radius = 0.26
-	hs.height = 0.52
-	hs.material = skin
-	head.mesh = hs
-	head.position = Vector3(0, 1.78, 0)
-	player_node.add_child(head)
-	var hair := _box(Vector3(0.56, 0.5, 0.3), hair_m)
-	hair.position = Vector3(0, 1.82, 0.14)
-	player_node.add_child(hair)
-	for ex in [-0.18, 0.18]:
-		var ear := _box(Vector3(0.12, 0.2, 0.1), hair_m)
-		ear.position = Vector3(ex, 2.1, 0.1)
-		player_node.add_child(ear)
-		var inner := _box(Vector3(0.06, 0.1, 0.05), _mat(Color(0.79, 0.34, 0.42)))
-		inner.position = Vector3(ex, 2.1, 0.05)
-		player_node.add_child(inner)
-	# legs on hip pivots
-	for side in [-1.0, 1.0]:
-		var pivot := Node3D.new()
-		pivot.position = Vector3(side * 0.16, 0.78, 0)
-		var leg := _box(Vector3(0.2, 0.72, 0.22), skin)
-		leg.position = Vector3(0, -0.36, 0)
-		pivot.add_child(leg)
-		var shoe := _box(Vector3(0.24, 0.14, 0.34), shoe_m)
-		shoe.position = Vector3(0, -0.7, -0.04)
-		pivot.add_child(shoe)
-		player_node.add_child(pivot)
-		if side < 0.0:
-			leg_l = pivot
-		else:
-			leg_r = pivot
-	# right arm pivot + knife
-	arm_r = Node3D.new()
-	arm_r.position = Vector3(0.48, 1.35, 0)
-	var arm := _box(Vector3(0.16, 0.55, 0.18), hoodie)
-	arm.position = Vector3(0, -0.25, 0)
-	arm_r.add_child(arm)
-	var grip := _box(Vector3(0.09, 0.22, 0.09), _mat(Color(0.35, 0.23, 0.11)))
-	grip.position = Vector3(0, -0.55, -0.1)
-	arm_r.add_child(grip)
-	knife_blade = _box(Vector3(0.07, 0.09, 0.75), _mat(Color(0.85, 0.88, 0.95), Color(0.9, 0.95, 1.0), 0.6))
-	knife_blade.position = Vector3(0, -0.55, -0.55)
-	arm_r.add_child(knife_blade)
-	player_node.add_child(arm_r)
-	var arm_l := _box(Vector3(0.16, 0.55, 0.18), hoodie)
-	arm_l.position = Vector3(-0.48, 1.1, 0)
-	player_node.add_child(arm_l)
+	var pal := _hero_pal()
+	if hero_tex1 == null:
+		hero_tex1 = _pixel_tex(HERO_BACK_1, pal)
+	if hero_tex2 == null:
+		hero_tex2 = _pixel_tex(HERO_BACK_2, pal)
+	if hero_tex_slash == null:
+		hero_tex_slash = _pixel_tex(HERO_SLASH, pal)
+	hero_sprite = _sprite3d(hero_tex1, 0.08, 0.75)
+	player_node.add_child(hero_sprite)
 	add_child(player_node)
 	# chase camera rig: yaw + shoulder offset, spring arm pulls in on walls
 	cam_rig = Node3D.new()
@@ -1238,26 +1482,17 @@ func _build_room_nodes() -> void:
 	# pickups + enemies
 	for it in items:
 		var p: Vector2i = it["cell"]
-		var node := _box(Vector3(0.5, 0.8, 0.5), _mat(Color(0.05, 0.6, 0.25), Color(0.0, 0.8, 0.4), 1.0))
-		node.position = Vector3(p.x * CELL, 1.0, p.y * CELL)
-		node.rotation.y = 0.6
-		room_node.add_child(node)
+		var cpair: Array = _item_tex("crys")
+		var cnode := _sprite3d(_cached_tex("item_crys", cpair[0], cpair[1]), 0.07, 0.9)
+		cnode.position = Vector3(p.x * CELL, 0.9, p.y * CELL)
+		room_node.add_child(cnode)
 		it["pos"] = Vector3(p.x * CELL, 0.0, p.y * CELL)
-		it["node"] = node
+		it["node"] = cnode
 		it["taken"] = false
 	for ex in extras:
 		var p: Vector2i = ex["cell"]
-		var col := Color(1, 0, 0)
-		if ex["kind"] == "sharp":
-			col = Color(1.0, 0.84, 0.0)
-		elif ex["kind"] == "boots":
-			col = Color(0.29, 0.17, 0.07)
-		elif ex["kind"] == "melon":
-			col = Color(0.1, 0.55, 0.2)
-		var msize := Vector3(0.45, 0.45, 0.45)
-		if ex["kind"] == "melon":
-			msize = Vector3(0.7, 0.55, 0.55) # heavy sun-melon
-		var node := _box(msize, _mat(col, col, 0.8))
+		var xpair: Array = _item_tex(String(ex["kind"]))
+		var node := _sprite3d(_cached_tex("item_" + String(ex["kind"]), xpair[0], xpair[1]), 0.07, 0.9)
 		node.position = Vector3(p.x * CELL, 0.9, p.y * CELL)
 		room_node.add_child(node)
 		ex["pos"] = Vector3(p.x * CELL, 0.0, p.y * CELL)
@@ -1268,15 +1503,6 @@ func _build_room_nodes() -> void:
 
 func _build_enemy_node(e: Dictionary) -> void:
 	var p: Vector2i = e["cell"]
-	var body_col := Color(1, 0, 0)
-	if e["type"] == "dash":
-		body_col = Color(0.63, 0.0, 1.0)
-	if e["elite"]:
-		body_col = Color(1.0, 0.53, 0.0)
-	if e["boss"]:
-		body_col = Color(1.0, 0.75, 0.0)
-	if e["type"] == "tuhkanaama":
-		body_col = Color(0.04, 0.04, 0.05) # soot-black, eyes glow out
 	var scale_f := 1.0
 	if e["elite"]:
 		scale_f = 1.35
@@ -1292,32 +1518,23 @@ func _build_enemy_node(e: Dictionary) -> void:
 	col.shape = cap
 	col.position = Vector3(0, 0.8 * scale_f, 0)
 	n.add_child(col)
-	var mat := _mat(body_col)
-	var mi := MeshInstance3D.new()
-	var cm := CapsuleMesh.new()
-	cm.radius = 0.4 * scale_f
-	cm.height = 1.4 * scale_f
-	cm.material = mat
-	mi.mesh = cm
-	mi.position = Vector3(0, 0.8 * scale_f, 0)
-	n.add_child(mi)
-	var eyes := _box(Vector3(0.5 * scale_f, 0.16 * scale_f, 0.1), _mat(Color(1, 1, 1), Color(1, 1, 1), 0.7))
-	eyes.position = Vector3(0, 1.15 * scale_f, -0.32 * scale_f)
-	n.add_child(eyes)
+	var pair: Array = _enemy_tex(String(e["type"]), bool(e["boss"]))
+	var ekey := "boss" if bool(e["boss"]) else "enemy_" + String(e["type"])
+	var sprite := _sprite3d(_cached_tex(ekey, pair[0], pair[1]), 0.09, 0.8 * scale_f)
+	sprite.scale = Vector3.ONE * scale_f
+	n.add_child(sprite)
+	var base_mod := Color(1, 1, 1)
+	if e["elite"]:
+		base_mod = Color(1.5, 0.9, 0.5)
+	sprite.modulate = base_mod
 	if e.get("enslaved", false):
 		_add_collar(n) # chains travel between rooms
-	if e["type"] == "tuhkanaama":
-		# white glowing teeth, seed-spitting grin
-		var grin := _mat(Color(1, 1, 1), Color(1, 1, 0.9), 1.6)
-		for tx in [-0.18, -0.06, 0.06, 0.18]:
-			var tooth := _box(Vector3(0.09 * scale_f, 0.14 * scale_f, 0.06), grin)
-			tooth.position = Vector3(tx * scale_f, 0.92 * scale_f, -0.34 * scale_f)
-			n.add_child(tooth)
 	n.position = Vector3(p.x * CELL, 0.1, p.y * CELL)
 	(room_node if room_node else self).add_child(n)
 	e["node"] = n
-	e["mesh"] = mi
-	e["mat"] = mat
+	e["mesh"] = sprite
+	e["sprite"] = sprite
+	e["base_mod"] = base_mod
 
 func _place_player_spawn() -> void:
 	player_node.position = Vector3(1.5 * CELL, 0.1, TH * CELL / 2.0 - CELL / 2.0)
@@ -1393,6 +1610,15 @@ func _build_hud() -> void:
 	layer.add_child(minimap)
 	minimap.game = self
 	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. Left thumb move, right thumb look, KNIFE hold to slash.")
+	var title_tex := TextureRect.new()
+	title_tex.texture = load("res://assets/caterpillar.png") as Texture2D
+	title_tex.custom_minimum_size = Vector2(560, 180)
+	title_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	title_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	title_tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var title_vb := title_panel.get_child(0) as VBoxContainer
+	title_vb.add_child(title_tex)
+	title_vb.move_child(title_tex, 0)
 	dead_panel = _overlay(layer, "YOU DIED", "The cave keeps the knife.\nTap or ENTER for a new cave.")
 	win_panel = _overlay(layer, "ENSLAVED AND DELIVERED!", "A chained tuhkanaama kneels at the glowing exit. The cave releases its master.\n\n" + LORE_OUTRO + "\nTap or ENTER for a new cave.")
 	codex_panel = _overlay(layer, "THE CAVE REMEMBERS", _codex_text(), "CLOSE")
