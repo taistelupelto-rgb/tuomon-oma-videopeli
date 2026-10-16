@@ -95,6 +95,7 @@ var ri := 0
 var hp := 3
 var max_hp := 5
 var score := 0
+var best_score := 0
 var kills := 0
 var combo := 0
 var combo_t := 0.0
@@ -164,6 +165,16 @@ var joy_knob: Panel
 var touch_layer: CanvasLayer
 var has_touch := false
 
+func _hs_load() -> void:
+	if not FileAccess.file_exists("user://best.cfg"): return
+	var f := FileAccess.open("user://best.cfg", FileAccess.READ)
+	if f == null: return
+	var line := f.get_line()
+	if line != "": best_score = maxi(0, int(line))
+func _hs_save() -> void:
+	var f := FileAccess.open("user://best.cfg", FileAccess.WRITE)
+	if f == null: return
+	f.store_line(str(best_score))
 func _ready() -> void:
 	autoplay = false
 	for a in OS.get_cmdline_user_args():
@@ -174,6 +185,7 @@ func _ready() -> void:
 	_build_hud()
 	_build_audio()
 	_build_voice_bank()
+	_hs_load()
 	show_title()
 
 func _build_voice_bank() -> void:
@@ -973,6 +985,7 @@ func hurt(src: String) -> void:
 		say("die")
 		state = "dead"
 		play_sfx(SFX_DEATH)
+		if score > best_score: best_score = score; _hs_save()
 		_refresh_overlays()
 		return
 	if src == "spike":
@@ -988,6 +1001,7 @@ func _win() -> void:
 	say("win")
 	state = "win"
 	play_sfx(SFX_WIN)
+	if score > best_score: best_score = score; _hs_save()
 	_refresh_overlays()
 
 # ---------------- builders ----------------
@@ -1563,7 +1577,7 @@ func _refresh_hud() -> void:
 	var hearts := ""
 	for i in max_hp:
 		hearts += "H" if i < hp else "-"
-	hud_top.text = "LV %02d  HP %s %d/%d  SCORE %06d  CHAIN %d" % [ri + 1, hearts, hp, max_hp, score, _chained_count()]
+	hud_top.text = "LV %02d  HP %s %d/%d  SCORE %06d  CHAIN %d BEST %06d" % [ri + 1, hearts, hp, max_hp, score, _chained_count(), best_score]
 	hud_combo.text = ("COMBO x%d" % combo) if combo > 1 else ""
 	hud_inv.text = _inv_text()
 	if is_instance_valid(joy_knob):
