@@ -71,6 +71,8 @@ const SFX_ROUND2 := preload("res://assets/sfx/round_2.ogg")
 const SFX_FINAL := preload("res://assets/sfx/final_round.ogg")
 const SFX_WIN := preload("res://assets/sfx/you_win.ogg")
 const SFX_DEATH := preload("res://assets/sfx/game_over.ogg")
+const SFX_CHAINED := preload("res://assets/sfx/chained.ogg")
+const SFX_WARDEN := preload("res://assets/sfx/warden_down.ogg")
 
 var state := "title" # title | play | dead | win
 var paused_game := false
@@ -576,6 +578,7 @@ func _enslave(e: Dictionary) -> void:
 	e["hp"] = 1
 	score += 200
 	play_sfx(SFX_DOOR)
+	play_sfx(SFX_CHAINED)
 	_add_collar(e["node"] as Node3D)
 	announce("CHAINED! The tuhkanaama kneels. Haul it to the final exit.")
 
@@ -613,6 +616,7 @@ func _kill_enemy(e: Dictionary) -> void:
 	(e["node"] as Node3D).visible = false
 	if e["boss"]:
 		announce("WARDEN DOWN! Reach the glowing exit.")
+		play_sfx(SFX_WARDEN)
 
 func _enemy_update(delta: float) -> void:
 	var pp := player_node.position

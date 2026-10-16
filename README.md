@@ -32,6 +32,8 @@ vine boom (death), fart (spikes), sad trombone womp womp (death), oof
 (enemy punch), bonk (wall bump), honk (loot), boing (dash windup),
 record scratch (pause).
 Unhinged as requested.
+Announcer voice generated locally with Piper en_US-ryan-medium (fight, round_2, round_3, final_round, you_win, game_over, chained, warden_down).
+Regen: `echo "Fight!" | piper --model en_US-ryan-medium.onnx --output_file fight.wav` then `ffmpeg -y -i fight.wav -af loudnorm=I=-16:TP=-1.5:LRA=11,aresample=22050 -ar 22050 -c:a libvorbis -q:a 4 fight.ogg`.
 
 ```
 ████████╗██╗   ██╗ ██████╗ ███╗   ███╗ ██████╗ ███╗   ██╗
