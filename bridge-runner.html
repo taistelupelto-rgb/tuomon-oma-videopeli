@@ -1051,15 +1051,19 @@ function render() {
     b.fillStyle = "rgba(255,246,218,0.8)";
     b.fillRect(sunSX - 9, 46, 18, 2);
   }
-  zbuf2.fill(999);
-  beginWorld();
+  beginWorld(); // clears wdata + zbuf2
   const flick = 0.9 + 0.1 * Math.sin(tick * 0.11);
+  const camRX = -dirY, camRY = dirX;
   // ---- REAL 3D: floor + ceiling as textured quads (per-tile, pixelart checker) ----
   for (let my = 0; my < TH; my++) for (let mx = 0; mx < TW; mx++) {
     const dx = mx + 0.5 - camPX, dy = my + 0.5 - camPY;
     const fw = dx * dirX + dy * dirY;
     if (fw < -1) continue; // behind
     if (dx * dx + dy * dy > 144) continue; // 12-tile cull
+    if (fw > 0.3) {
+      const side = dx * camRX + dy * camRY;
+      if (Math.abs(side) > fw * 0.9 + 1.3) continue; // off-screen tile
+    }
     const chk = ((mx + my) % 2 === 0);
     const dist = Math.max(0.5, Math.hypot(dx, dy));
     const fl = wallShade(dist, 1, flick * (1 + 0.3 * sunF));
@@ -1087,18 +1091,26 @@ function render() {
     const cxw = mx + 0.5 - camPX, cyw = my + 0.5 - camPY;
     const cdist = Math.max(0.4, Math.hypot(cxw, cyw));
     if (cdist > 13) continue;
+    const cfw = cxw * dirX + cyw * dirY;
+    if (cfw < -1.5) continue; // whole tile behind camera
+    if (cfw > 0.3) {
+      const cside = cxw * camRX + cyw * camRY;
+      if (Math.abs(cside) > cfw * 0.9 + 1.6) continue; // off-screen box
+    }
+    // facing cull: only draw faces on the camera side of the box.
+    // Halves wall tris, backs never visible on axis boxes.
     const faces = [
-      { n: isSolid(mx, my - 1) ? 0 : 1, q: [mx, my, 0, mx + 1, my, 0, mx + 1, my, hTop, mx, my, hTop], s: 1 },
-      { n: isSolid(mx, my + 1) ? 0 : 1, q: [mx, my + 1, 0, mx, my + 1, hTop, mx + 1, my + 1, hTop, mx + 1, my + 1, 0], s: 0.72 },
-      { n: isSolid(mx - 1, my) ? 0 : 1, q: [mx, my, 0, mx, my, hTop, mx, my + 1, hTop, mx, my + 1, 0], s: 0.85 },
-      { n: isSolid(mx + 1, my) ? 0 : 1, q: [mx + 1, my, 0, mx + 1, my + 1, 0, mx + 1, my + 1, hTop, mx + 1, my, hTop], s: 0.85 }
+      { n: (camPY < my + 0.02 && !isSolid(mx, my - 1)) ? 1 : 0, q: [mx, my, 0, mx + 1, my, 0, mx + 1, my, hTop, mx, my, hTop], s: 1 },
+      { n: (camPY > my + 1 - 0.02 && !isSolid(mx, my + 1)) ? 1 : 0, q: [mx, my + 1, 0, mx, my + 1, hTop, mx + 1, my + 1, hTop, mx + 1, my + 1, 0], s: 0.72 },
+      { n: (camPX < mx + 0.02 && !isSolid(mx - 1, my)) ? 1 : 0, q: [mx, my, 0, mx, my, hTop, mx, my + 1, hTop, mx, my + 1, 0], s: 0.85 },
+      { n: (camPX > mx + 1 - 0.02 && !isSolid(mx + 1, my)) ? 1 : 0, q: [mx + 1, my, 0, mx + 1, my + 1, 0, mx + 1, my + 1, hTop, mx + 1, my, hTop], s: 0.85 }
     ];
     for (const F of faces) {
       if (!F.n) continue;
       const f = wallShade(cdist, F.s, flick * pulse * (1 + 0.3 * sunF));
       quad3(F.q[0], F.q[1], F.q[2], F.q[3], F.q[4], F.q[5], F.q[6], F.q[7], F.q[8], F.q[9], F.q[10], F.q[11], base, f);
-      // brick seams: darker top/bottom lip via thin quads (pixelart detail)
-      if (c !== "E" && c !== "s") {
+      // brick seams: near-only LOD. Far lips cost tris, add no pixels.
+      if (c !== "E" && c !== "s" && cdist < 7) {
         const lip = f * 0.55;
         quad3(F.q[0], F.q[1], hTop * 0.88, F.q[3], F.q[4], hTop * 0.88, F.q[6], F.q[7], hTop * 0.88, F.q[9], F.q[10], hTop * 0.88, base, lip);
       }
