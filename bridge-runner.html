@@ -3,147 +3,194 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CATERPILLAR RUNNER — top-down cave crawler, how this bot works</title>
+<title>CATERPILLAR: knife of the mother — isaac-like pipeline crawler</title>
 <style>
   body { background:#0a0a12; color:#e8e8e8; font-family:monospace; text-align:center; margin:16px; }
-  h1 { color:#4caf50; letter-spacing:4px; margin:4px; }
+  h1 { color:#c33; letter-spacing:3px; margin:4px; }
   #cap { color:#ff0; min-height:2.5em; max-width:640px; margin:8px auto; }
-  canvas { border:3px solid #4caf50; background:#0d0d18; image-rendering:pixelated; }
+  canvas { border:3px solid #c33; background:#1a1410; image-rendering:pixelated; }
   p.help { color:#888; font-size:13px; }
 </style>
 </head>
 <body>
-<h1>CATERPILLAR RUNNER</h1>
+<h1>CATERPILLAR: KNIFE OF THE MOTHER</h1>
 <div id="cap">loading...</div>
 <canvas id="g" width="640" height="400"></canvas>
-<p class="help">WASD / arrows: crawl &nbsp;|&nbsp; SPACE: slash knife &nbsp;|&nbsp; ENTER: start / continue &nbsp;|&nbsp; R: restart level<br>
-You are the caterpillar. Spawned in a cave with only a knife. Eat every glowing crystal, then reach the gate. Slash the red timeout daemons before they touch you.</p>
+<p class="help">WASD / arrows: crawl &nbsp;|&nbsp; HOLD SPACE: fling the knife, steer it with movement, release to recall &nbsp;|&nbsp; ENTER: start &nbsp;|&nbsp; R: retry room<br>
+Isaac rules: clear each room (crystals + daemons) to open the doors. Knife kills daemons in 2 hits. 3 hearts. No tears, only knife.</p>
 <script>
 "use strict";
 const cv = document.getElementById("g"), ctx = cv.getContext("2d");
 const cap = document.getElementById("cap");
 const W = 640, H = 400;
 
-// TOP-DOWN cave crawler. You are the caterpillar from the README.
-// Same pipeline lesson as before: phone -> bridge bot -> agent -> tools -> phone.
-const LEVELS = [
+// Binding-of-Isaac-like: rooms, doors, rocks, chaser daemons, Mom's-Knife blade.
+// Lesson unchanged: phone -> bridge bot -> agent + tools -> phone.
+function mkEnemy(x, y, sp) { return {x:x, y:y, w:16, h:16, hp:2, sp:sp, dead:false, cool:0}; }
+
+const ROOMS = [
   {
-    name: "LEVEL 1/3 — SPAWN CAVE",
-    about: "You spawn in a dark cave with only a knife. Jaska types '?ask ...' in Telegram; the bridge bot forwards it here. Eat 3 crystals, slash or dodge the daemon, reach the BRIDGE gate.",
-    spawn: [40, 200],
-    walls: [[0,0,640,12],[0,388,640,12],[0,0,12,400],[628,0,12,400],[200,60,14,180],[420,160,14,180],[200,60,234,14]],
-    items: [[110,110],[320,320],[530,90]],
-    goal: [580, 190, 36, 36],
-    goalLabel: "BRIDGE",
-    enemies: [{x:300,y:60,w:16,h:16,axis:"y",min:60,max:300,dx:1.6,dead:false}]
+    name: "ROOM 1/4 — SPAWN CAVE",
+    about: "You spawn in a cave with only a knife. Jaska types '?ask ...' in Telegram. Eat the crystal, walk east through the door.",
+    spawn: [60, 200],
+    rocks: [[300,120,30,30]],
+    items: [[500,200]],
+    enemies: [],
+    goal: null
   },
   {
-    name: "LEVEL 2/3 — THE AGENT THINKS",
-    about: "The agent cannot guess: it must READ files and RUN tools. The crystals are context. Your knife is the shell. Collect 4 crystals, clear the daemons, reach the ANSWER gate.",
-    spawn: [40, 200],
-    walls: [[0,0,640,12],[0,388,640,12],[0,0,12,400],[628,0,12,400],[150,0,14,250],[320,150,14,250],[490,0,14,250]],
-    items: [[80,80],[240,330],[410,80],[560,330]],
-    goal: [580, 190, 36, 36],
-    goalLabel: "ANSWER",
-    enemies: [
-      {x:240,y:60,w:16,h:16,axis:"y",min:60,max:300,dx:2.0,dead:false},
-      {x:410,y:300,w:16,h:16,axis:"y",min:80,max:300,dx:-2.2,dead:false}
-    ]
+    name: "ROOM 2/4 — THE BRIDGE",
+    about: "The bridge bot polls Telegram and forwards the message into this machine. Two timeout daemons guard the pipe. Fling the knife (hold SPACE, steer, release). Doors open when the room is clear.",
+    spawn: [60, 200],
+    rocks: [[300,80,30,30],[300,290,30,30]],
+    items: [[320,200],[500,100]],
+    enemies: [mkEnemy(450,150,1.0), mkEnemy(450,260,1.0)],
+    goal: null
   },
   {
-    name: "LEVEL 3/3 — DELIVERY",
-    about: "Answer ready. Carry it back through the cave and post it into the Telegram chat. Three daemons guard the PHONE gate. Your knife is hungry.",
-    spawn: [40, 200],
-    walls: [[0,0,640,12],[0,388,640,12],[0,0,12,400],[628,0,12,400],[180,80,220,14],[240,300,220,14],[180,80,14,120],[446,200,14,114]],
-    items: [[320,190],[100,330],[540,60]],
-    goal: [580, 190, 36, 36],
-    goalLabel: "PHONE",
-    enemies: [
-      {x:120,y:150,w:16,h:16,axis:"x",min:60,max:560,dx:2.4,dead:false},
-      {x:500,y:250,w:16,h:16,axis:"x",min:60,max:560,dx:-2.8,dead:false},
-      {x:320,y:80,w:16,h:16,axis:"y",min:40,max:340,dx:2.0,dead:false}
-    ]
+    name: "ROOM 3/4 — THE AGENT THINKS",
+    about: "The agent wakes up. It cannot guess: crystals are context it must READ, the knife is the shell it must RUN. Three daemons. Clear them all.",
+    spawn: [60, 200],
+    rocks: [[200,150,30,30],[410,220,30,30],[300,300,30,30]],
+    items: [[320,90],[500,310]],
+    enemies: [mkEnemy(300,200,1.1), mkEnemy(480,120,1.1), mkEnemy(480,300,1.1)],
+    goal: null
+  },
+  {
+    name: "ROOM 4/4 — DELIVERY",
+    about: "Answer ready. Carry it to the PHONE gate and post it back into the Telegram chat. Last two daemons. The knife is hungry.",
+    spawn: [60, 200],
+    rocks: [[300,150,30,100]],
+    items: [[150,100]],
+    enemies: [mkEnemy(420,140,1.2), mkEnemy(420,270,1.2)],
+    goal: [560, 182, 36, 36]
   }
 ];
+const WIN_TEXT = "DELIVERED! The caterpillar crawls home: phone -> bridge bot -> agent + tools -> phone. Press ENTER to crawl again.";
 
-const WIN_TEXT = "DELIVERED! The caterpillar crawls home. That is the whole system: phone -> bridge bot -> agent + tools -> phone. Press ENTER to crawl again.";
-
+const DOOR = {y:170, h:60}; // door gap in east/west walls
 let state = "title";
-let li = 0, px = 0, py = 0, got = 0, items = [], banner = 0;
-let fx = 1, fy = 0;          // facing
-let trail = [];              // past head positions for body segments
-let slash = 0, cooldown = 0; // knife swing timer
+let ri = 0, px = 0, py = 0, hp = 3, iframes = 0;
+let fx = 1, fy = 0;
+let knife = {mode:"held", x:0, y:0, dx:1, dy:0};
 let keys = {};
+
 addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
   keys[k] = true;
-  if (e.key === "Enter" && (state === "title" || state === "win")) { startGame(); }
-  if ((k === "r") && state === "play") { loadLevel(li); }
-  if (k === " " && state === "play" && cooldown === 0) { slash = 8; cooldown = 22; }
+  if (e.key === "Enter" && (state === "title" || state === "win")) startGame();
+  if (k === "r" && state === "play") loadRoom(ri, true);
   if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)) e.preventDefault();
 });
 addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
 
-function loadLevel(i) {
-  const L = LEVELS[i];
-  px = L.spawn[0]; py = L.spawn[1]; got = 0;
-  fx = 1; fy = 0; trail = []; slash = 0; cooldown = 0;
-  items = L.items.map(p => ({x:p[0], y:p[1], taken:false}));
-  for (const e of L.enemies) e.dead = false;
-  banner = 150;
-  cap.textContent = L.name + " — " + L.about;
+function roomState(i) {
+  const R = ROOMS[i];
+  return {
+    items: R.items.map(p => ({x:p[0], y:p[1], taken:false})),
+    enemies: R.enemies.map(e => ({x:e.x, y:e.y, w:16, h:16, hp:2, sp:e.sp, dead:false, cool:0}))
+  };
 }
-function startGame() { state = "play"; li = 0; loadLevel(0); }
+let cur = null;
+function loadRoom(i, hpReset) {
+  const R = ROOMS[i];
+  cur = roomState(i);
+  px = R.spawn[0]; py = R.spawn[1];
+  fx = 1; fy = 0;
+  knife = {mode:"held", x:0, y:0, dx:1, dy:0};
+  if (hpReset) hp = 3;
+  iframes = 0;
+  cap.textContent = R.name + " — " + R.about;
+}
+function startGame() { state = "play"; ri = 0; hp = 3; loadRoom(0, false); }
 
 function hit(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
+function roomClear() {
+  return cur.items.every(i => i.taken) && cur.enemies.every(e => e.dead);
+}
+// solid rock in this room (walls handled by clamping + door gaps)
+function rockAt(x, y, w, h) {
+  return ROOMS[ri].rocks.some(r => hit({x:x, y:y, w:w, h:h}, {x:r[0], y:r[1], w:r[2], h:r[3]}));
+}
+function inDoorGap(y) { return y + 14 > DOOR.y && y < DOOR.y + DOOR.h; }
 
 function update() {
   if (state !== "play") return;
-  const L = LEVELS[li];
+  const R = ROOMS[ri];
   const sp = 2.6;
-  let nx = px, ny = py, moved = false;
-  if (keys["a"] || keys["arrowleft"]) { nx -= sp; fx = -1; fy = 0; moved = true; }
-  if (keys["d"] || keys["arrowright"]) { nx += sp; fx = 1; fy = 0; moved = true; }
-  if (keys["w"] || keys["arrowup"]) { ny -= sp; fx = 0; fy = -1; moved = true; }
-  if (keys["s"] || keys["arrowdown"]) { ny += sp; fx = 0; fy = 1; moved = true; }
-  const me = {x:nx, y:py, w:14, h:14};
-  const blocked = L.walls.some(w => hit(me, {x:w[0], y:w[1], w:w[2], h:w[3]}));
-  if (!blocked) {
-    px = Math.max(12, Math.min(W - 26, nx));
-    py = Math.max(12, Math.min(H - 26, ny));
+  let vx = 0, vy = 0;
+  if (keys["a"] || keys["arrowleft"]) { vx = -sp; fx = -1; fy = 0; }
+  if (keys["d"] || keys["arrowright"]) { vx = sp; fx = 1; fy = 0; }
+  if (keys["w"] || keys["arrowup"]) { vy = -sp; fx = 0; fy = -1; }
+  if (keys["s"] || keys["arrowdown"]) { vy += sp; fx = 0; fy = 1; }
+  // axis-separated move with rock collision
+  let nx = px + vx;
+  if (!rockAt(nx, py, 14, 14)) px = nx;
+  let ny = py + vy;
+  if (!rockAt(px, ny, 14, 14)) py = ny;
+  // clamp to room, allow door gaps
+  const westOpen = ri > 0, eastOpen = ri < ROOMS.length - 1;
+  if (px < 12) {
+    if (westOpen && roomClear() && inDoorGap(py)) { ri--; loadRoom(ri, false); px = W - 30; return; }
+    px = 12;
   }
-  me.x = px; me.y = py;
-  if (moved) {
-    trail.unshift({x:px + 7, y:py + 7});
-    if (trail.length > 24) trail.pop();
+  if (px > W - 26) {
+    if (eastOpen && roomClear() && inDoorGap(py)) { ri++; loadRoom(ri, false); px = 20; return; }
+    px = W - 26;
   }
-  for (const it of items) {
-    if (!it.taken && hit(me, {x:it.x - 6, y:it.y - 6, w:12, h:12})) { it.taken = true; got++; }
+  py = Math.max(12, Math.min(H - 26, py));
+  const me = {x:px, y:py, w:14, h:14};
+
+  for (const it of cur.items) {
+    if (!it.taken && hit(me, {x:it.x - 6, y:it.y - 6, w:12, h:12})) it.taken = true;
   }
-  // knife slash: kills daemons in front of the caterpillar
-  if (slash > 0) {
-    slash--;
-    const kx = px + 7 + fx * 22, ky = py + 7 + fy * 22;
-    for (const e of L.enemies) {
-      if (!e.dead && Math.hypot(e.x + 8 - kx, e.y + 8 - ky) < 24) e.dead = true;
+
+  // MOM'S KNIFE: hold space to fling, steer with movement, release to recall
+  const wantKnife = !!keys[" "];
+  const cx = px + 7, cy = py + 7;
+  if (knife.mode === "held") {
+    knife.x = cx + fx * 12; knife.y = cy + fy * 12;
+    knife.dx = fx; knife.dy = fy;
+    if (wantKnife) knife.mode = "flying";
+  } else if (knife.mode === "flying") {
+    knife.dx = fx; knife.dy = fy; // steerable, like mom's knife
+    const dist = Math.hypot(knife.x - cx, knife.y - cy);
+    if (dist < 150) { knife.x += knife.dx * 6; knife.y += knife.dy * 6; }
+    else { knife.x = cx + knife.dx * 150; knife.y = cy + knife.dy * 150; }
+    if (!wantKnife) knife.mode = "back";
+  } else { // back
+    const dx = cx - knife.x, dy = cy - knife.y, d = Math.hypot(dx, dy);
+    if (d < 10) knife.mode = "held";
+    else { knife.x += dx / d * 9; knife.y += dy / d * 9; }
+  }
+  // knife damage
+  for (const e of cur.enemies) {
+    if (e.dead) continue;
+    if (e.cool > 0) e.cool--;
+    if (knife.mode !== "held" && e.cool === 0 &&
+        Math.hypot(e.x + 8 - knife.x, e.y + 8 - knife.y) < 18) {
+      e.hp--; e.cool = 25;
+      if (e.hp <= 0) e.dead = true;
     }
   }
-  if (cooldown > 0) cooldown--;
-  for (const e of L.enemies) {
+  // daemons chase (isaac-style chasers)
+  for (const e of cur.enemies) {
     if (e.dead) continue;
-    if (e.axis === "x") { e.x += e.dx; if (e.x < e.min || e.x > e.max) e.dx *= -1; }
-    else { e.y += e.dx; if (e.y < e.min || e.y > e.max) e.dx *= -1; }
-    if (hit(me, e)) { loadLevel(li); return; }
+    const dx = cx - (e.x + 8), dy = cy - (e.y + 8), d = Math.hypot(dx, dy) || 1;
+    e.x += dx / d * e.sp; e.y += dy / d * e.sp;
+    if (iframes === 0 && hit(me, e)) {
+      hp--; iframes = 70;
+      if (hp <= 0) { hp = 3; loadRoom(ri, false); return; }
+    }
   }
-  const g = {x:L.goal[0], y:L.goal[1], w:L.goal[2], h:L.goal[3]};
-  if (got === items.length && hit(me, g)) {
-    li++;
-    if (li >= LEVELS.length) { state = "win"; cap.textContent = WIN_TEXT; }
-    else loadLevel(li);
+  if (iframes > 0) iframes--;
+
+  if (R.goal && roomClear()) {
+    const g = {x:R.goal[0], y:R.goal[1], w:R.goal[2], h:R.goal[3]};
+    if (hit(me, g)) { state = "win"; cap.textContent = WIN_TEXT; }
   }
-  if (banner > 0) banner--;
 }
 
 function circle(x, y, r, c) {
@@ -151,95 +198,112 @@ function circle(x, y, r, c) {
   ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
 }
 
+function drawWalls() {
+  const last = ri === ROOMS.length - 1, first = ri === 0;
+  ctx.fillStyle = "#3a2f26";
+  ctx.fillRect(0, 0, W, 12); ctx.fillRect(0, H - 12, W, 12);
+  ctx.fillRect(0, 0, 12, H); ctx.fillRect(W - 12, 0, 12, H);
+  // door gaps
+  ctx.fillStyle = "#1a1410";
+  if (!first && roomClear()) ctx.fillRect(0, DOOR.y, 12, DOOR.h);
+  if (!last && roomClear()) ctx.fillRect(W - 12, DOOR.y, 12, DOOR.h);
+  // locked doors drawn as grates
+  ctx.fillStyle = "#661";
+  if ((!first && !roomClear())) ctx.fillRect(0, DOOR.y, 12, DOOR.h);
+  if ((!last && !roomClear())) ctx.fillRect(W - 12, DOOR.y, 12, DOOR.h);
+}
+
 function draw() {
-  ctx.fillStyle = "#0d0d18"; ctx.fillRect(0, 0, W, H);
+  // isaac-ish floor: checker dirt
+  ctx.fillStyle = "#5a4a3a"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#544534";
+  for (let y = 12; y < H - 12; y += 24)
+    for (let x = 12 + ((y / 24 % 2) * 12); x < W - 12; x += 24)
+      ctx.fillRect(x, y, 12, 12);
   if (state === "title") {
-    ctx.fillStyle = "#4caf50"; ctx.font = "bold 40px monospace"; ctx.textAlign = "center";
-    ctx.fillText("CATERPILLAR RUNNER", W/2, 130);
-    ctx.fillStyle = "#ff0"; ctx.font = "16px monospace";
-    ctx.fillText("Top-down cave crawler. You are the caterpillar.", W/2, 180);
-    ctx.fillText("One knife. Three levels. Phone -> bridge -> agent -> phone.", W/2, 205);
+    ctx.fillStyle = "#c33"; ctx.font = "bold 32px monospace"; ctx.textAlign = "center";
+    ctx.fillText("CATERPILLAR", W/2, 120);
+    ctx.fillText("KNIFE OF THE MOTHER", W/2, 160);
+    ctx.fillStyle = "#ff0"; ctx.font = "15px monospace";
+    ctx.fillText("No tears. Only knife.", W/2, 200);
     ctx.fillStyle = "#fff";
-    ctx.fillText("Press ENTER to spawn", W/2, 270);
+    ctx.fillText("Press ENTER to spawn", W/2, 260);
     return;
   }
   if (state === "win") {
-    ctx.fillStyle = "#0f0"; ctx.font = "bold 40px monospace"; ctx.textAlign = "center";
+    ctx.fillStyle = "#0f0"; ctx.font = "bold 38px monospace"; ctx.textAlign = "center";
     ctx.fillText("DELIVERED!", W/2, 150);
     ctx.fillStyle = "#fff"; ctx.font = "15px monospace";
-    const lines = ["phone -> bridge bot -> agent + tools -> phone.", "The caterpillar crawls home.", "Press ENTER to crawl again."];
-    lines.forEach((l, i) => ctx.fillText(l, W/2, 200 + i*28));
+    ["phone -> bridge bot -> agent + tools -> phone.",
+     "The caterpillar crawls home.",
+     "Press ENTER to crawl again."].forEach((l, i) => ctx.fillText(l, W/2, 200 + i*28));
     return;
   }
-  const L = LEVELS[li];
-  // cave rock walls
-  ctx.fillStyle = "#2a2a3a";
-  for (const w of L.walls) ctx.fillRect(w[0], w[1], w[2], w[3]);
-  ctx.fillStyle = "#3d3d55";
-  for (const w of L.walls) ctx.fillRect(w[0], w[1], w[2], 3);
+  const R = ROOMS[ri];
+  drawWalls();
+  // rocks
+  for (const r of R.rocks) {
+    ctx.fillStyle = "#2b2b2b"; ctx.fillRect(r[0], r[1], r[2], r[3]);
+    ctx.fillStyle = "#555"; ctx.fillRect(r[0], r[1], r[2], 5);
+  }
   // crystals
-  for (const it of items) {
+  for (const it of cur.items) {
     if (it.taken) continue;
-    circle(it.x, it.y, 7, "#083");
+    circle(it.x, it.y, 7, "#073");
     circle(it.x, it.y, 5, "#0cf");
     circle(it.x - 1, it.y - 1, 2, "#fff");
   }
-  // gate
-  const open = got === items.length;
-  const g = L.goal;
-  ctx.fillStyle = open ? "#0f0" : "#555";
-  ctx.fillRect(g[0], g[1], g[2], g[3]);
-  ctx.fillStyle = "#000"; ctx.font = "bold 9px monospace"; ctx.textAlign = "center";
-  ctx.fillText(L.goalLabel, g[0] + 18, g[1] + 21);
+  // phone gate
+  if (R.goal) {
+    const open = roomClear();
+    ctx.fillStyle = open ? "#0f0" : "#555";
+    ctx.fillRect(R.goal[0], R.goal[1], R.goal[2], R.goal[3]);
+    ctx.fillStyle = "#000"; ctx.font = "bold 9px monospace"; ctx.textAlign = "center";
+    ctx.fillText("PHONE", R.goal[0] + 18, R.goal[1] + 21);
+  }
   // daemons
-  for (const e of L.enemies) {
+  for (const e of cur.enemies) {
     if (e.dead) continue;
-    ctx.fillStyle = "#f00";
+    ctx.fillStyle = e.cool > 0 ? "#f88" : "#f00";
     ctx.fillRect(e.x, e.y, e.w, e.h);
     ctx.fillStyle = "#fff";
     ctx.fillRect(e.x + 3, e.y + 3, 4, 4);
     ctx.fillRect(e.x + 9, e.y + 3, 4, 4);
+    if (e.hp === 1) { ctx.fillStyle = "#000"; ctx.fillRect(e.x + 3, e.y + 11, 10, 2); }
   }
-  // caterpillar body trail (tail to head)
+  // caterpillar: head + segments trail behind facing
   const cx = px + 7, cy = py + 7;
-  for (let i = Math.min(trail.length - 1, 17); i >= 3; i -= 3) {
-    const t = trail[i];
-    circle(t.x, t.y, 6, "#1b3a1b");
-    circle(t.x, t.y, 5, "#2e7d32");
+  if (!(iframes > 0 && (iframes % 8) < 4)) {
+    for (let s = 3; s >= 1; s--) {
+      circle(cx - fx * s * 11, cy - fy * s * 11, 6, "#1b3a1b");
+      circle(cx - fx * s * 11, cy - fy * s * 11, 5, "#2e7d32");
+    }
+    circle(cx, cy, 8, "#1b3a1b");
+    circle(cx, cy, 7, "#43a047");
+    circle(cx + fx * 3, cy + fy * 3 - 2, 3, "#fff");
+    circle(cx + fx * 4, cy + fy * 4 - 2, 1.5, "#f00");
   }
-  // head
-  circle(cx, cy, 8, "#1b3a1b");
-  circle(cx, cy, 7, "#43a047");
-  // angry eye looks where we face
-  circle(cx + fx * 3, cy + fy * 3 - 2, 3, "#fff");
-  circle(cx + fx * 4, cy + fy * 4 - 2, 1.5, "#f00");
-  // knife: held forward, swings when slashing
-  const kx = cx + fx * 10, ky = cy + fy * 10;
-  const sw = slash > 0 ? (8 - slash) * 0.35 : 0;
-  const bx = kx + fx * 12 - fy * sw * 14, by = ky + fy * 12 + fx * sw * 14;
-  ctx.strokeStyle = slash > 0 ? "#fff" : "#c0c5d3";
-  ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(bx, by); ctx.stroke();
-  ctx.strokeStyle = "#6b4a22";
-  ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(cx + fx * 6, cy + fy * 6); ctx.lineTo(kx, ky); ctx.stroke();
-  if (slash > 0) {
-    ctx.strokeStyle = "rgba(255,255,255,0.6)";
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(cx, cy, 26, 0, 7); ctx.stroke();
+  // mom's knife
+  if (knife.mode !== "held" || true) {
+    const ang = Math.atan2(knife.dy || fy, knife.dx || fx);
+    ctx.save();
+    ctx.translate(knife.x, knife.y);
+    ctx.rotate(ang);
+    ctx.fillStyle = "#6b4a22"; ctx.fillRect(-12, -2, 8, 4);   // handle
+    ctx.fillStyle = "#c0c5d3"; ctx.fillRect(-4, -3, 22, 6);    // blade
+    ctx.fillStyle = "#fff"; ctx.fillRect(8, -1, 10, 2);        // shine
+    ctx.restore();
+  }
+  // hearts
+  for (let h = 0; h < 3; h++) {
+    ctx.fillStyle = h < hp ? "#f00" : "#400";
+    ctx.fillRect(16 + h * 22, 36, 16, 14);
   }
   ctx.fillStyle = "#fff"; ctx.font = "12px monospace"; ctx.textAlign = "left";
-  ctx.fillText(L.name + "   crystals " + got + "/" + items.length, 16, 28);
-  if (banner > 0) {
-    ctx.fillStyle = "rgba(0,0,0,0.75)"; ctx.fillRect(40, 150, W - 80, 100);
-    ctx.fillStyle = "#ff0"; ctx.font = "bold 22px monospace"; ctx.textAlign = "center";
-    ctx.fillText(L.name, W/2, 190);
-    ctx.fillStyle = "#fff"; ctx.font = "13px monospace";
-    ctx.fillText("eat crystals, slash daemons, reach " + L.goalLabel, W/2, 218);
-  }
+  ctx.fillText(R.name, 16, 28);
 }
 
-cap.textContent = "Press ENTER. Spawn in the cave with only a knife.";
+cap.textContent = "Press ENTER. No tears. Only knife.";
 (function loop() { update(); draw(); requestAnimationFrame(loop); })();
 </script>
 </body>
