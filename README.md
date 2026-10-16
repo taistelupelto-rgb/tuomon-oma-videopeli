@@ -2,6 +2,12 @@
 
 ![banner](assets/banner.png)
 
+## The hero
+
+![caterpillar](assets/caterpillar.png)
+
+Spawned in a dark cave. No armor. No backup. One knife.
+
 ```
 ████████╗██╗   ██╗ ██████╗ ███╗   ███╗ ██████╗ ███╗   ██╗
 ╚══██╔══╝██║   ██║██╔═══██╗████╗ ████║██╔═══██╗████╗  ██║
