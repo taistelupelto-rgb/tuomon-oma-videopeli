@@ -8,6 +8,19 @@
 
 Spawned in a dark cave. No armor. No backup. One knife.
 
+## Sound
+
+SFX are real CC0 clips by Kenney (no attribution required, credited anyway),
+embedded in `bridge-runner.html` so the single-file release stays single-file.
+Raw files live in `assets/sfx/`. Packs used:
+
+- [RPG Audio](https://kenney.nl/assets/rpg-audio) — knife slices, coins, pot, door
+- [Impact Sounds](https://kenney.nl/assets/impact-sounds) — punches, metal, bell
+- [Voiceover Pack (Fighter)](https://kenney.nl/assets/voiceover-pack-fighter) — the announcer (FIGHT! FINAL ROUND! YOU WIN!)
+
+Plus synthesized stingers: airhorn (win), vine boom (death), fart (spikes).
+Unhinged as requested.
+
 ```
 ████████╗██╗   ██╗ ██████╗ ███╗   ███╗ ██████╗ ███╗   ██╗
 ╚══██╔══╝██║   ██║██╔═══██╗████╗ ████║██╔═══██╗████╗  ██║
