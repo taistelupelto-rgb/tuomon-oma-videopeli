@@ -179,6 +179,10 @@ var joy_vec := Vector2.ZERO
 var look_last := Vector2.ZERO
 var joy_base: Panel
 var joy_knob: Panel
+var ball_id := -1
+var ball_origin := Vector2.ZERO
+var ball_base: Panel
+var ball_knob: Panel
 var touch_layer: CanvasLayer
 var has_touch := false
 
@@ -794,6 +798,9 @@ func start_run(new_seed: int) -> void:
 	touch_slash = false
 	joy_id = -1
 	look_id = -1
+	ball_id = -1
+	if is_instance_valid(ball_knob) and is_instance_valid(ball_base):
+		ball_knob.position = (ball_base.size - ball_knob.size) * 0.5
 	joy_vec = Vector2.ZERO
 	_load_room(0, false) # permadeath: no chains survive a new run
 	state = "play"
@@ -1116,6 +1123,10 @@ func _input(event: InputEvent) -> void:
 			# Let HUD buttons handle their own touches: bottom-right
 			# KNIFE/EAT cluster + top-right pause must not start a look-drag.
 			var on_buttons := (pos.x > vp.x * 0.55 and pos.y > vp.y * 0.55) or (pos.x > vp.x - 100.0 and pos.y < 260.0)
+			if state == "play" and not paused_game and ball_id == -1 and not on_buttons and is_instance_valid(ball_base) and ball_base.get_global_rect().has_point(pos):
+				ball_id = event.index
+				ball_origin = pos
+				return
 			if state == "play" and not paused_game and pos.x < vp.x * 0.5 and pos.y > vp.y * 0.3 and joy_id == -1:
 				joy_id = event.index
 				joy_origin = pos
@@ -1127,6 +1138,11 @@ func _input(event: InputEvent) -> void:
 				look_id = event.index
 				look_last = event.position
 		else:
+			if event.index == ball_id:
+				ball_id = -1
+				if is_instance_valid(ball_base) and is_instance_valid(ball_knob):
+					ball_knob.position = (ball_base.size - ball_knob.size) * 0.5
+				return
 			if event.index == joy_id:
 				joy_id = -1
 				joy_vec = Vector2.ZERO
@@ -1141,6 +1157,16 @@ func _input(event: InputEvent) -> void:
 				look_id = -1
 		return
 	if event is InputEventScreenDrag:
+		if event.index == ball_id:
+			if state == "play" and not paused_game:
+				yaw -= event.relative.x * 0.006
+				cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
+			if is_instance_valid(ball_base) and is_instance_valid(ball_knob):
+				var boff: Vector2 = (event.position - ball_origin) / 80.0
+				if boff.length() > 1.0:
+					boff = boff.normalized()
+				ball_knob.position = (ball_base.size - ball_knob.size) * 0.5 + boff * 52.0
+			return
 		if event.index == joy_id:
 			var d: Vector2 = (event.position - joy_origin) / 85.0
 			if d.length() > 1.0:
@@ -1161,8 +1187,18 @@ func _input(event: InputEvent) -> void:
 			_refresh_overlays()
 			return
 	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		if is_instance_valid(ball_base) and is_instance_valid(touch_layer) and touch_layer.visible and ball_base.get_global_rect().has_point(event.position):
+			if state == "play" and not paused_game:
+				yaw -= event.relative.x * 0.006
+				cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
+			return
 		var vp2 := get_viewport().get_visible_rect().size
 		if state == "play" and not paused_game and event.position.x > vp2.x * 0.3:
+			yaw -= event.relative.x * 0.006
+			cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
+		return
+	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_MIDDLE) != 0:
+		if state == "play" and not paused_game:
 			yaw -= event.relative.x * 0.006
 			cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
 		return
@@ -2338,6 +2374,30 @@ func _build_touch() -> void:
 	eat.mouse_filter = Control.MOUSE_FILTER_STOP
 	eat.pressed.connect(_on_eat_button)
 	touch_layer.add_child(eat)
+	ball_base = Panel.new()
+	ball_base.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	ball_base.offset_left = -216
+	ball_base.offset_top = -472
+	ball_base.offset_right = -16
+	ball_base.offset_bottom = -272
+	ball_base.add_theme_stylebox_override("panel", circle.call(Color(0, 1, 0, 0.15), 100, 3))
+	ball_base.mouse_filter = Control.MOUSE_FILTER_STOP
+	touch_layer.add_child(ball_base)
+	ball_knob = Panel.new()
+	ball_knob.offset_left = 52
+	ball_knob.offset_top = 52
+	ball_knob.offset_right = 148
+	ball_knob.offset_bottom = 148
+	ball_knob.add_theme_stylebox_override("panel", circle.call(Color(0, 1, 0, 0.35), 48, 2))
+	ball_knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ball_base.add_child(ball_knob)
+	var ball_label := Label.new()
+	ball_label.text = "BALL"
+	ball_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ball_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ball_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ball_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ball_base.add_child(ball_label)
 	var pausb := Button.new()
 	pausb.text = "II"
 	pausb.set_anchors_preset(Control.PRESET_TOP_RIGHT)
