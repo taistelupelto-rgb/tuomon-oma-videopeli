@@ -897,6 +897,72 @@ function drawDaemon(sx, yTop, w, h, e, dist) {
   }
 }
 
+// ---------- player model: 2D anime femboy (clothed, nekomimi) ----------
+const FEMBOY_MAP = [
+  "..oo........oo..",
+  "..oho......oho..",
+  ".ohho......ohho.",
+  ".dhhhhhhhhhhhhh.",
+  ".hhsssshhsssshh.",
+  ".dhsssssssssshd.",
+  ".hhsspsssspwshh.",
+  ".hhsppssssppshh.",
+  ".hhsbbssssbbshh.",
+  ".hhsssssssssshh.",
+  ".hhssssmmsssshh.",
+  "..hssssssssssh..",
+  ".....qqqqqq.....",
+  "..cccccccccccc..",
+  ".cccccccccccccc.",
+  ".ccccrrccrrcccc.",
+  ".cccccccccccccc.",
+  "..cccccccccccc.."
+];
+const FEMBOY_PAL = {
+  o: "#2a1a24", h: "#ffb3c8", d: "#e07fa2", s: "#ffe3c8", q: "#f2c7a4",
+  w: "#ffffff", p: "#4a2a5e", b: "#ff9db0", m: "#c9576b", c: "#f2f2fa", r: "#e03050"
+};
+// moods: normal | blink | hurt | dead | win
+function drawFemboy(x, y, s, mood) {
+  for (let ry = 0; ry < FEMBOY_MAP.length; ry++) {
+    const row = FEMBOY_MAP[ry];
+    let rx = 0;
+    while (rx < row.length) {
+      const ch = row[rx];
+      let run = 1;
+      while (rx + run < row.length && row[rx + run] === ch) run++;
+      if (ch !== ".") {
+        ctx.fillStyle = FEMBOY_PAL[ch];
+        ctx.fillRect(x + rx * s, y + ry * s, run * s, s);
+      }
+      rx += run;
+    }
+  }
+  const patch = (cx, cy, cw, ch, col) => {
+    ctx.fillStyle = col;
+    ctx.fillRect(x + cx * s, y + cy * s, cw * s, ch * s);
+  };
+  if (mood === "dead") {
+    patch(4, 6, 2, 2, FEMBOY_PAL.s); patch(10, 6, 2, 2, FEMBOY_PAL.s);
+    patch(4, 6, 1, 1, FEMBOY_PAL.o); patch(5, 7, 1, 1, FEMBOY_PAL.o);
+    patch(5, 6, 1, 1, FEMBOY_PAL.o); patch(4, 7, 1, 1, FEMBOY_PAL.o);
+    patch(10, 6, 1, 1, FEMBOY_PAL.o); patch(11, 7, 1, 1, FEMBOY_PAL.o);
+    patch(11, 6, 1, 1, FEMBOY_PAL.o); patch(10, 7, 1, 1, FEMBOY_PAL.o);
+    patch(7, 10, 2, 1, FEMBOY_PAL.o);
+  } else if (mood === "win") {
+    patch(4, 6, 2, 2, FEMBOY_PAL.s); patch(10, 6, 2, 2, FEMBOY_PAL.s);
+    patch(4, 7, 2, 1, FEMBOY_PAL.o); patch(10, 7, 2, 1, FEMBOY_PAL.o);
+    patch(6, 9, 1, 1, FEMBOY_PAL.b); patch(9, 9, 1, 1, FEMBOY_PAL.b);
+  } else if (mood === "hurt") {
+    patch(7, 10, 2, 1, FEMBOY_PAL.s);
+    patch(7, 9, 2, 2, FEMBOY_PAL.m);
+    patch(13, 6, 1, 1, "#9cf");
+  } else if (mood === "blink") {
+    patch(4, 6, 2, 2, FEMBOY_PAL.s); patch(10, 6, 2, 2, FEMBOY_PAL.s);
+    patch(4, 7, 2, 1, FEMBOY_PAL.o); patch(10, 7, 2, 1, FEMBOY_PAL.o);
+  }
+}
+
 function drawAutoMap() {
   const s = 4, ox = W - TW * s - 10, oy = 44;
   ctx.fillStyle = "rgba(0,0,0,0.6)";
@@ -916,6 +982,7 @@ function drawAutoMap() {
 function draw() {
   if (state === "title") {
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+    drawFemboy(W / 2 - 40, 8, 5, (tick % 140) < 8 ? "blink" : "normal");
     ctx.fillStyle = "#c33"; ctx.font = "bold 30px monospace"; ctx.textAlign = "center";
     ctx.fillText("CATERPILLAR", W/2, 120);
     ctx.fillText("KNIFE OF THE MOTHER 2.5D", W/2, 158);
@@ -932,6 +999,7 @@ function draw() {
   if (state === "dead") {
     render();
     ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(0, 0, W, H);
+    drawFemboy(W / 2 - 48, 34, 6, "dead");
     ctx.fillStyle = "#f00"; ctx.font = "bold 44px monospace"; ctx.textAlign = "center";
     ctx.fillText("YOU DIED", W/2, 170);
     ctx.fillStyle = "#fff"; ctx.font = "15px monospace";
@@ -940,6 +1008,7 @@ function draw() {
   }
   if (state === "win") {
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+    drawFemboy(W / 2 - 48, 26, 6, "win");
     ctx.fillStyle = "#0f0"; ctx.font = "bold 38px monospace"; ctx.textAlign = "center";
     ctx.fillText("DELIVERED!", W/2, 150);
     ctx.fillStyle = "#fff"; ctx.font = "15px monospace";
@@ -964,6 +1033,10 @@ function draw() {
     ctx.fillStyle = h < hp ? "#f00" : "#400";
     ctx.fillRect(14 + h * 22, 30, 16, 14);
   }
+  // player model, bottom-left, reacts to the run
+  const mood = (flash > 0 || iframes > 40) ? "hurt"
+    : (tick % 120) < 7 ? "blink" : "normal";
+  drawFemboy(14, H - 18 * 4 - 8, 4, mood);
   drawAutoMap();
   ctx.fillStyle = "#fff"; ctx.font = "12px monospace"; ctx.textAlign = "left";
   ctx.fillText(Rm.name + "  [seed " + seed + " " + modifier + "]  kills " + kills, 12, 20);

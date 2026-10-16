@@ -8,6 +8,15 @@
 
 Spawned in a dark cave. No armor. No backup. One knife.
 
+## The player model
+
+![femboy](assets/femboy.png)
+
+2D nekomimi femboy, 16x18 pixels, drawn straight onto the canvas — no sprite
+sheet, no external assets. Five moods: idle, blink, hurt (sweat drop, open
+mouth), dead (X eyes), win (happy eyes). Lives bottom-left in the HUD, goes big
+on the title, death and win screens. Fully clothed; the cave stays SFW.
+
 ## Sound
 
 SFX are real CC0 clips by Kenney (no attribution required, credited anyway),
@@ -57,30 +66,34 @@ Unhinged as requested.
 Tuomo's own video game. Born as a single `Hello world!`, destined for
 greatness. Plot, engine, sprites, boss fights — all to be forged here.
 
-## Current build: v0.0.1 "just spawned"
+## Current build: v0.1.0 "femboy edition"
 
 - [x] Repository created
 - [x] Insane README art installed
-- [ ] Game engine (to be chosen)
-- [ ] First playable level
-- [ ] Boss fight
-- [ ] Victory screen
+- [x] Game engine (canvas raycaster, single file)
+- [x] First playable level
+- [x] Boss fight
+- [x] Victory screen
 
-## Run it (someday)
+## Run it
 
 ```sh
 git clone https://github.com/taistelupelto-rgb/tuomon-oma-videopeli.git
 cd tuomon-oma-videopeli
-# there is no game yet. stare at the banner. feel the power.
+# single file, zero build, zero deps:
+xdg-open bridge-runner.html   # or drag it into a browser
 ```
 
 ## Controls
 
 | Key       | Action              |
 |-----------|---------------------|
-| `W A S D` | Move (eventually)   |
-| `SPACE`   | Jump (eventually)   |
-| `ENTER`   | Press start (now!)  |
+| `W A S D` | Move / strafe       |
+| `← →`     | Turn                |
+| `SPACE`   | Slash (hold)        |
+| `ENTER`   | Start / new run     |
+| `R`       | Reroll the cave     |
+| `P`       | Pause               |
 
 ```
    GAME OVER? never heard of her.
