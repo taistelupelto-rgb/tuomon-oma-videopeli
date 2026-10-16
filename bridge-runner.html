@@ -26,7 +26,7 @@
   <canvas id="g" width="640" height="400"></canvas>
   <div id="joy"></div><div id="knob"></div><div id="knifeBtn">KNIFE</div><div id="pauseBtn">II</div>
 </div>
-<p class="help">WASD: move &nbsp;|&nbsp; arrows left/right: turn &nbsp;|&nbsp; hold SPACE: slash &nbsp;|&nbsp; ENTER: new run &nbsp;|&nbsp; R: reroll &nbsp;|&nbsp; P: pause<br>
+<p class="help">3rd person: the hero is on screen, legs and all. WASD: move &nbsp;|&nbsp; arrows left/right: turn (left goes left now) &nbsp;|&nbsp; hold SPACE: slash &nbsp;|&nbsp; ENTER: new run &nbsp;|&nbsp; R: reroll &nbsp;|&nbsp; P: pause<br>
 Mobile: left thumb = joystick (forward/strafe), drag right side = look, red button = knife, II = pause.<br>
 Rooms, not levels. Seeded caves, modifiers, elites, spikes, permadeath. No tears, only knife.</p>
 <script>
@@ -164,7 +164,14 @@ let px = 1.5, py = TH / 2, dirX = 1, dirY = 0, planeX = 0, planeY = 0.66;
 // third-person chase camera: trails the hero, over the right shoulder
 const CAM_BACK = 1.9, SHOULDER = 0.45;
 let camPX = 1.5, camPY = TH / 2;
-let walkPhase = 0, walkAmp = 0;
+let walkPhase = 0, walkAmp = 0, heroLean = 0;
+// weather: rain streaks + a fixed sun direction (cave skylights, don't ask)
+const SUN_X = 0.83, SUN_Y = -0.55;
+let rainDrops = [];
+function rainDrop(anyY) {
+  return {x: Math.random() * BUF_W, y: anyY ? Math.random() * BUF_H : -8,
+    spd: 90 + Math.random() * 70, len: 4 + Math.random() * 5};
+}
 let attackT = 0, attackCd = 0, flash = 0, shake = 0, tick = 0;
 let lastBonk = -99, lastBoing = -99;
 let keys = {};
@@ -475,7 +482,7 @@ function loadRoom(i) {
     clearAnnounced: false
   };
   px = 1.5; py = TH / 2; dirX = 1; dirY = 0; planeX = 0; planeY = 0.66;
-  camPX = px; camPY = py; walkPhase = 0; walkAmp = 0;
+  camPX = px; camPY = py; walkPhase = 0; walkAmp = 0; heroLean = 0;
   updateChaseCam(true);
   attackT = 0; attackCd = 0;
   visited[i] = true;
@@ -568,21 +575,41 @@ function worldToScreen(gx, gy) {
   return {sx:(BUF_W / 2) * (1 + tx / ty), size:BUF_H / ty, ty:ty};
 }
 
-// third-person chase cam: behind the hero, over the right shoulder, pulled in on walls
+// third-person chase cam: behind the hero, over the right shoulder, pulled in on walls.
+// Continuous pull-in (no discrete pops) + fast follow (no swimmy lag).
 function updateChaseCam(snap) {
   const rx = -dirY, ry = dirX;
   const wantX = px - dirX * CAM_BACK + rx * SHOULDER;
   const wantY = py - dirY * CAM_BACK + ry * SHOULDER;
   let k = 0;
-  for (const t of [1, 0.7, 0.45, 0.2, 0]) {
+  for (let t = 1; t >= 0; t -= 0.05) {
     const cx = px + (wantX - px) * t, cy = py + (wantY - py) * t;
     if (!solidAt(cx, cy) && !solidAt(cx + 0.15, cy) && !solidAt(cx - 0.15, cy) &&
         !solidAt(cx, cy + 0.15) && !solidAt(cx, cy - 0.15)) { k = t; break; }
   }
   const tx = px + (wantX - px) * k, ty = py + (wantY - py) * k;
   if (snap) { camPX = tx; camPY = ty; return; }
-  camPX += (tx - camPX) * 0.25;
-  camPY += (ty - camPY) * 0.25;
+  camPX += (tx - camPX) * 0.35;
+  camPY += (ty - camPY) * 0.35;
+}
+
+// rain falls in screen space; wind drifts it sideways
+function updateRain() {
+  if (rainDrops.length === 0) {
+    for (let i = 0; i < 90; i++) rainDrops.push(rainDrop(true));
+  }
+  for (const d of rainDrops) {
+    d.y += d.spd / 60;
+    d.x -= 0.7;
+    if (d.y > BUF_H + 6) { d.y = -8; d.x = Math.random() * (BUF_W + 20); }
+    if (d.x < -6) d.x += BUF_W + 20;
+  }
+}
+function drawRain() {
+  b.fillStyle = "rgba(150,180,220,0.45)";
+  for (const d of rainDrops) {
+    b.fillRect(d.x, d.y, 1, d.len);
+  }
 }
 
 let particles = [];
@@ -621,7 +648,9 @@ function update() {
   const moving = mag > 0.1;
   if (moving) walkPhase += 0.28 * Math.min(1.2, mag);
   walkAmp += ((moving ? 1 : 0) - walkAmp) * 0.15;
+  heroLean += ((strafe * 12) - heroLean) * 0.2;
   updateChaseCam(false);
+  updateRain();
   // spike tile
   if (cellAt(px, py) === "s") hurt("spike");
   if (state !== "play") return;
@@ -759,14 +788,14 @@ function castColumn(x) {
   return {dist:dist, side:side, cell:cell};
 }
 
-// third-person hero: back view with animated legs + knife, drawn over the world
+// third-person hero: back view with animated legs + knife, drawn over the world.
+// Screen-anchored (fixed spot, fixed size): projecting the hero through their own
+// camera made them swim, swell and sink near walls. Only a strafe lean moves them.
 function drawHero() {
-  const pr = worldToScreen(px, py);
-  const sx = pr ? Math.max(20, Math.min(BUF_W - 20, pr.sx)) : BUF_W * 0.38;
-  const size = pr ? pr.ty : 1.9;
-  const hgt = Math.max(46, Math.min(132, (BUF_H / size) * 0.9));
+  const sx = BUF_W * 0.36 + heroLean;
+  const hgt = 96;
   const u = hgt / 95;
-  const feetY = BUF_H / 2 + (BUF_H / size) * 0.28;
+  const feetY = BUF_H - 14;
   const bobY = -Math.abs(Math.sin(walkPhase)) * 3 * u * walkAmp;
   const y0 = feetY - hgt + bobY; // top of head
   const hurtBlink = (iframes > 40 && (tick % 8) < 4) || flash > 0;
@@ -847,6 +876,21 @@ function drawHero() {
 function render() {
   // ceiling + floor bands
   b.fillStyle = "#05050f"; b.fillRect(0, 0, BUF_W, BUF_H / 2);
+  // sunshine through the cave skylights: glow when facing the sun
+  const sunF = Math.max(0, dirX * SUN_X + dirY * SUN_Y);
+  if (sunF > 0.2) {
+    const pr = worldToScreen(camPX + SUN_X * 10, camPY + SUN_Y * 10);
+    const sunSX = pr ? Math.max(12, Math.min(BUF_W - 12, pr.sx)) : BUF_W / 2;
+    const g = b.createRadialGradient(sunSX, 36, 4, sunSX, 36, 80);
+    g.addColorStop(0, "rgba(255,238,190," + (0.55 * sunF).toFixed(2) + ")");
+    g.addColorStop(1, "rgba(255,238,190,0)");
+    b.fillStyle = g;
+    b.fillRect(0, 0, BUF_W, BUF_H / 2);
+    b.fillStyle = "#fff6da";
+    b.beginPath(); b.arc(sunSX, 34, 6, 0, 7); b.fill();
+    b.fillStyle = "rgba(255,246,218,0.8)";
+    b.fillRect(sunSX - 9, 46, 18, 2);
+  }
   for (let y = BUF_H / 2; y < BUF_H; y += 2) {
     const f = 1 - (y - BUF_H / 2) / (BUF_H / 2);
     b.fillStyle = y % 4 === 0 ? shade("#3a2f26", 0.25 + f * 0.55) : shade("#2c231c", 0.25 + f * 0.55);
@@ -864,7 +908,7 @@ function render() {
     if (r.cell === "s") base = "#3d3d4a";
     if (r.cell === "E") base = roomClear() ? "#0f6" : "#345";
     const pulse = r.cell === "E" && roomClear() ? 0.85 + 0.15 * Math.sin(tick * 0.2) : 1;
-    let f = Math.max(0.12, Math.min(1.3, 1.25 - r.dist * 0.16)) * (r.side === 1 ? 0.72 : 1) * flick * pulse;
+    let f = Math.max(0.12, Math.min(1.3, 1.25 - r.dist * 0.16)) * (r.side === 1 ? 0.72 : 1) * flick * pulse * (1 + 0.3 * sunF);
     b.fillStyle = shade(base, f);
     b.fillRect(x, y0, 1, h);
     if (r.cell !== "E" && h > 6) {
@@ -949,6 +993,8 @@ function render() {
       b.fillText("EXIT BEHIND YOU", BUF_W / 2, 22);
     }
   }
+  // rain falls over the world, hero stays dry-ish under the skylights
+  drawRain();
   // third-person hero with the stinking legs, knife in hand
   drawHero();
   // damage flash
