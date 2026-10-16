@@ -117,6 +117,7 @@ var hud_top: Label
 var hud_cap: Label
 var hud_room: Label
 var hud_combo: Label
+var hud_inv: Label
 var cap_t := 0.0
 var title_panel: PanelContainer
 var dead_panel: PanelContainer
@@ -129,6 +130,8 @@ var sfx_players: Array = []
 var sfx_i := 0
 var autoplay := false
 var auto_t := 0
+var inventory: Array = [] # slots: {kind, count}. persists rooms, dies on new run.
+const INV_SLOTS := 8
 var probe_swings := 0
 var probe_hits := 0
 var probe_calls := 0
@@ -159,6 +162,7 @@ func start_run(new_seed: int) -> void:
 	knife_dmg = 1
 	speed_bonus = 0.0
 	seen = {}
+	inventory.clear()
 	_load_room(0, false) # permadeath: no chains survive a new run
 	state = "play"
 	paused_game = false
@@ -336,6 +340,8 @@ func _input(event: InputEvent) -> void:
 			_refresh_overlays()
 		elif k == KEY_C and state == "play":
 			codex_panel.visible = not codex_panel.visible
+		elif state == "play" and not paused_game and k >= KEY_1 and k <= KEY_8:
+			inv_use(k - KEY_1)
 
 func _process(delta: float) -> void:
 	tick += 1
@@ -664,35 +670,100 @@ func _spawn_minion(at: Vector3) -> void:
 	_build_enemy_node(e)
 	announce("The warden calls a minion!")
 
+func inv_add(kind: String) -> bool:
+	if kind != "melon": # teeth-food is bulky: every melon takes its own slot
+		for s in inventory:
+			if s["kind"] == kind and int(s["count"]) < 99:
+				s["count"] = int(s["count"]) + 1
+				return true
+	if inventory.size() >= INV_SLOTS:
+		return false
+	inventory.append({"kind": kind, "count": 1})
+	return true
+
+func inv_use(slot: int) -> void:
+	if state != "play" or paused_game:
+		return
+	if slot < 0 or slot >= inventory.size():
+		return
+	var s: Dictionary = inventory[slot]
+	if s["kind"] == "melon" or s["kind"] == "heart":
+		if hp >= max_hp:
+			announce("HP full. Save it for the dark.")
+			return
+		hp = mini(max_hp, hp + 1)
+		s["count"] = int(s["count"]) - 1
+		play_sfx(SFX_COIN)
+		announce("Ate sun-melon." if s["kind"] == "melon" else "Heart consumed. +1 HP.")
+		if int(s["count"]) <= 0:
+			inventory.remove_at(slot)
+	elif s["kind"] == "crys":
+		announce("Milk-teeth are for the exit, not for eating.")
+	_refresh_hud()
+
+func _inv_text() -> String:
+	var parts: Array = []
+	for i in inventory.size():
+		parts.append("%d:%s x%d" % [i + 1, String(inventory[i]["kind"]), int(inventory[i]["count"])])
+	while parts.size() < INV_SLOTS:
+		parts.append("%d:--" % (parts.size() + 1))
+	return "PACK [" + "  ".join(parts) + "]  (1-8 use)"
+
+func _melon_slot() -> int:
+	for i in inventory.size():
+		if inventory[i]["kind"] == "melon":
+			return i + 1
+	return 0
+
 func _pickup_update() -> void:
 	var pp := player_node.position
 	for it in items:
 		if it["taken"]:
 			continue
 		if pp.distance_to(it["pos"]) < 1.4:
+			if not inv_add("crys"):
+				announce("Pack full! Milk-tooth left on the floor.")
+				continue
 			it["taken"] = true
 			(it["node"] as Node3D).visible = false
 			score += 100
 			play_sfx(SFX_COIN)
-			announce("Crystal taken (%d left)." % _crystals_left())
+			announce("Crystal packed (%d left out there)." % _crystals_left())
 	for ex in extras:
 		if ex["taken"]:
 			continue
 		if pp.distance_to(ex["pos"]) < 1.4:
-			ex["taken"] = true
-			(ex["node"] as Node3D).visible = false
 			if ex["kind"] == "heart":
-				hp = mini(max_hp, hp + 1)
-				announce("Heart: +1 HP.")
+				if hp < max_hp:
+					hp = mini(max_hp, hp + 1)
+					ex["taken"] = true
+					(ex["node"] as Node3D).visible = false
+					announce("Heart: +1 HP.")
+				elif inv_add("heart"):
+					ex["taken"] = true
+					(ex["node"] as Node3D).visible = false
+					announce("Heart packed for later.")
+				else:
+					announce("Pack full! Left the heart.")
+					continue
+			elif ex["kind"] == "melon":
+				if inv_add("melon"):
+					ex["taken"] = true
+					(ex["node"] as Node3D).visible = false
+					score += 10
+					announce("Sun-melon packed. Tuhkanaama-free calories (press %d to eat)." % _melon_slot())
+				else:
+					announce("Pack full! The melon sits there, smelling.")
+					continue
 			elif ex["kind"] == "sharp":
 				knife_dmg = 2
+				ex["taken"] = true
+				(ex["node"] as Node3D).visible = false
 				announce("Sharp knife: double damage.")
-			elif ex["kind"] == "melon":
-				hp = mini(max_hp, hp + 1)
-				score += 25
-				announce("Sun-melon: sweet. +1 HP. The soot-face smells the rind.")
 			else:
 				speed_bonus += 1.0
+				ex["taken"] = true
+				(ex["node"] as Node3D).visible = false
 				announce("Boots: faster.")
 			play_sfx(SFX_COIN)
 
@@ -1088,6 +1159,12 @@ func _build_hud() -> void:
 	hud_cap.add_theme_color_override("font_color", Color(1, 1, 0.4))
 	hud_cap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	layer.add_child(hud_cap)
+	hud_inv = Label.new()
+	hud_inv.position = Vector2(12, 600)
+	hud_inv.size = Vector2(1100, 24)
+	hud_inv.add_theme_font_size_override("font_size", 14)
+	hud_inv.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
+	layer.add_child(hud_inv)
 	var portrait := TextureRect.new()
 	portrait.texture = load("res://assets/femboy.png") as Texture2D
 	portrait.position = Vector2(12, 560)
@@ -1099,7 +1176,7 @@ func _build_hud() -> void:
 	minimap.position = Vector2(1152 - 20 * 8 - 24, 44)
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nWASD move | Arrows turn | SPACE slash | R reroll | P pause | C codex\n\nPress ENTER to spawn")
+	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nWASD move | Arrows turn | SPACE slash | R reroll | P pause | C codex | 1-8 eat from pack\n\nPress ENTER to spawn")
 	dead_panel = _overlay(layer, "YOU DIED", "The cave keeps the knife.\nPress ENTER for a new cave.")
 	win_panel = _overlay(layer, "ENSLAVED AND DELIVERED!", "A chained tuhkanaama kneels at the glowing exit. The cave releases its master.\n\n" + LORE_OUTRO + "\nPress ENTER for a new cave.")
 	codex_panel = _overlay(layer, "THE CAVE REMEMBERS", _codex_text())
@@ -1137,6 +1214,7 @@ func _refresh_hud() -> void:
 		hearts += "H" if i < hp else "-"
 	hud_top.text = "LV %02d  HP %s %d/%d  SCORE %06d  CHAIN %d" % [ri + 1, hearts, hp, max_hp, score, _chained_count()]
 	hud_combo.text = ("COMBO x%d" % combo) if combo > 1 else ""
+	hud_inv.text = _inv_text()
 
 func _refresh_overlays() -> void:
 	title_panel.visible = state == "title"
@@ -1221,7 +1299,7 @@ func _bot_nearest_foe() -> Dictionary:
 func _autoplay(delta: float) -> void:
 	auto_t += 1
 	if auto_t % 600 == 0:
-		print("[autoplay] t=%d state=%s room=%d hp=%d chain=%d score=%d foes=%d swings=%d calls=%d minarc=%.2f hits=%d yaw=%.2f" % [auto_t, state, ri, hp, _chained_count(), score, enemies.size(), probe_swings, probe_calls, probe_min_arc, probe_hits, yaw])
+		print("[autoplay] t=%d state=%s room=%d hp=%d chain=%d score=%d foes=%d swings=%d calls=%d minarc=%.2f hits=%d inv=%s yaw=%.2f" % [auto_t, state, ri, hp, _chained_count(), score, enemies.size(), probe_swings, probe_calls, probe_min_arc, probe_hits, _inv_text(), yaw])
 		for e in enemies:
 			var ep: Vector3 = (e["node"] as Node3D).position
 			print("  foe type=%s hp=%s dead=%s ensl=%s d=%.1f" % [e["type"], e["hp"], e["dead"], e.get("enslaved", false), player_node.position.distance_to(ep)])
@@ -1231,6 +1309,11 @@ func _autoplay(delta: float) -> void:
 	if state == "dead" or state == "win":
 		start_run(1234 + auto_t) # smoke hook keeps exercising
 		return
+	if hp < max_hp: # smoke hook eats from the pack
+		for i in inventory.size():
+			if inventory[i]["kind"] == "melon" or inventory[i]["kind"] == "heart":
+				inv_use(i)
+				break
 	if state != "play" or auto_t < 30:
 		return
 	# cheat-walk the critical path: fight every 4th cycle, melons even, else crystals, else exit
