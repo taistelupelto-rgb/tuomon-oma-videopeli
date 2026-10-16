@@ -769,6 +769,7 @@ const FOCAL = 220, CAM_Z = 0.5;
 let camPitch = 0; // pixels, + looks up
 const zbuf2 = new Float32Array(BUF_W * BUF_H);
 const _shadeCache = {};
+let _shadeSize = 0;
 function shade(hex, f) {
   const q = (f * 8 | 0) / 8;
   const k = hex + q;
@@ -779,7 +780,7 @@ function shade(hex, f) {
   const g = Math.max(0, Math.min(255, ((n >> 8) & 255) * f)) | 0;
   const bl = Math.max(0, Math.min(255, (n & 255) * f)) | 0;
   const out = "rgb(" + r + "," + g + "," + bl + ")";
-  if (Object.keys(_shadeCache).length < 400) _shadeCache[k] = out;
+  if (_shadeSize < 512) { _shadeCache[k] = out; _shadeSize++; }
   return out;
 }
 // project world point through chase cam; null behind near plane
@@ -820,21 +821,24 @@ function drawTri(v0, v1, v2, col, f0, f1, f2) {
     }
   }
 }
+function tri3(pa, pb, pc, col, f) {
+  if (!pa || !pb || !pc) return;
+  const light = Math.max(0.12, Math.min(1.3, f));
+  drawTri(pa, pb, pc, col, light, light, light);
+}
 function quad3(ax, ay, az, bx, by, bz, cx2, cy2, cz2, dx2, dy2, dz2, col, f) {
   const pa = project3(ax, ay, az), pb = project3(bx, by, bz);
   const pc = project3(cx2, cy2, cz2), pd = project3(dx2, dy2, dz2);
-  // near-clip: drop quad if any vert behind (simple, no split; walls are big enough)
-  if (!pa || !pb || !pc || !pd) return;
-  // backface cull in screen space
-  const area = (pb.sx - pa.sx) * (pc.sy - pa.sy) - (pb.sy - pa.sy) * (pc.sx - pa.sx);
-  // draw both windings for floor/ceil (double-sided), cull walls single-sided
-  void area;
+  // near-clip: draw each fully-visible tri instead of dropping whole quad.
+  // Walls hug camera, old code left holes. Partial quads now stay solid.
   const light = Math.max(0.12, Math.min(1.3, f));
-  drawTri(pa, pb, pc, col, light, light, light);
-  drawTri(pa, pc, pd, col, light, light, light);
+  if (pa && pb && pc) drawTri(pa, pb, pc, col, light, light, light);
+  if (pa && pc && pd) drawTri(pa, pc, pd, col, light, light, light);
 }
 function wallShade(dist, sideShade, pulse) {
-  return Math.max(0.12, Math.min(1.3, (1.25 - dist * 0.13) * sideShade * pulse));
+  // exp fog keeps near walls punchy, far walls melt into cave dark.
+  const fog = Math.exp(-dist * dist * 0.008) * 0.75 + Math.exp(-dist * 0.18) * 0.5;
+  return Math.max(0.1, Math.min(1.3, fog * sideShade * pulse));
 }
 // per-column depth kept for sprites (min depth in that column)
 const zbuf = new Array(BUF_W);
@@ -1142,6 +1146,12 @@ function render() {
     b.fillStyle = "rgba(255,0,0,0.35)";
     b.fillRect(0, 0, BUF_W, BUF_H);
   }
+  // vignette: dark corners keep cave mood, cheap AAA feel
+  const vg = b.createRadialGradient(BUF_W / 2, BUF_H / 2, BUF_H * 0.42, BUF_W / 2, BUF_H / 2, BUF_H * 0.85);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(0,0,0,0.42)");
+  b.fillStyle = vg;
+  b.fillRect(0, 0, BUF_W, BUF_H);
   // blit with shake
   const shx = shake > 0 ? ((tick % 2) * 2 - 1) * shake : 0;
   const shy = shake > 0 ? (((tick + 1) % 2) * 2 - 1) * shake : 0;
