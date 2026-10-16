@@ -222,48 +222,48 @@ func say(cat: String) -> void:
 
 # ---------------- pixel sprites (hand-made, in code) ----------------
 const HERO_BACK_1 := [
-	"....HHHHHHHH....",
-	"...HHHHHHHHHH...",
-	"...HhHHHHHHhH...",
-	"...HhHHHHHHhH...",
-	"...HHHSSSSHHH...",
-	"....HHHHHHHH....",
-	"....HHHHHHHH....",
-	".....GGGGGG.....",
-	"....GGGGGGGG....",
-	"....GgGGGGgG....",
-	"....GgGGGGgG....",
-	"....GGGGGGGG....",
-	".....GGGGGG.....",
-	".....PPPPPP.....",
-	".....PpPPpP.....",
-	".....PpPPpP.....",
-	"....PP....PP....",
-	"....PP....PP....",
-	"....BB....BB....",
-	"....BB....BB....",
+	"....XXXXXXXX....",
+	"...XHHHHHHHHX...",
+	"...XHwHHHHwHX...",
+	"...XHwHHHHwHX...",
+	"...XHHSSSSHHX...",
+	".GG.XHHHHHHX....",
+	".GGGXXHHHHXX....",
+	".....XGGGGGX....",
+	"....XGGGGGGGX...",
+	"....XGgGGGGgX...",
+	"....XGgGGGGgX...",
+	"....XGGGGGGGX...",
+	".....XGGGGGX....",
+	".....XPPPPPX....",
+	".....XPpPPpX....",
+	".....XPpPPpX....",
+	"....XPPX..XPPX..",
+	"....XPPX..XPPX..",
+	"....XBBX..XBBX..",
+	"....XBBX..XBBX..",
 ]
 const HERO_BACK_2 := [
-	"....HHHHHHHH....",
-	"...HHHHHHHHHH...",
-	"...HhHHHHHHhH...",
-	"...HhHHHHHHhH...",
-	"...HHHSSSSHHH...",
-	"....HHHHHHHH....",
-	"....HHHHHHHH....",
-	".....GGGGGG.....",
-	"....GGGGGGGG....",
-	"....GgGGGGgG....",
-	"....GgGGGGgG....",
-	"....GGGGGGGG....",
-	".....GGGGGG.....",
-	".....PPPPPP.....",
-	".....PpPPpP.....",
-	".....PpPPpP.....",
-	"......PPPP......",
-	"......PPPP......",
-	"......PPPP......",
-	"......BBBB......",
+	"....XXXXXXXX....",
+	"...XHHHHHHHHX...",
+	"...XHHHwHHwHX...",
+	"...XHHHwHHwHX...",
+	"...XHHSSSSHHX...",
+	"....XHHHHHHX.GG.",
+	"....XXHHHHXXGGG.",
+	"....XGGGGGX.....",
+	"...XGGGGGGGX....",
+	"...XGgGGGGgX....",
+	"...XGgGGGGgX....",
+	"...XGGGGGGGX....",
+	"....XGGGGGX.....",
+	"....XPPPPPX.....",
+	"....XPpPPpX.....",
+	"....XPpPPpX.....",
+	".....XPPPPX.....",
+	".....XPPPPX.....",
+	".....XPPPPX.....",
+	".....XBBBBX.....",
 ]
 const HERO_SLASH := [
 	"....HHHHHHHH....",
@@ -288,22 +288,22 @@ const HERO_SLASH := [
 	"....BB....BB....",
 ]
 const IMP_CHASE := [
-	"................",
-	".....H....H.....",
-	".....HH..HH.....",
-	".....RRRRRR.....",
-	"....RRRRRRRR....",
-	"....RWRRRRWR....",
-	"....RWRRRRWR....",
-	"....RRRrrRRR....",
-	"....RRWWWWRR....",
-	".....RRRRRR.....",
-	".....RrRRrR.....",
-	"....RRRRRRRR....",
-	"...RRRRRRRRRR...",
-	"...RrR....RrR...",
-	"....RR....RR....",
-	"....BB....BB....",
+	"...KK......KK...",
+	"...KHHK..KHHK...",
+	"...KHHK..KHHK...",
+	"...KKRRRRRRKK...",
+	"...KRRRRRRRRK...",
+	"...KRWWRRWWRK...",
+	"...KRWWRRWWRK...",
+	"...KRRRrrRRRK...",
+	"...KRRWWWWRRK...",
+	"....KRRRRRRK....",
+	"....KRrRRrRK....",
+	"...KRRRRRRRRK...",
+	"..KRRRRRRRRRRK..",
+	"..KRrRK..KRrRK..",
+	"...KRRK..KRRK...",
+	"...KBBK..KBBK...",
 ]
 const IMP_DASH := [
 	"................",
@@ -326,10 +326,10 @@ const IMP_DASH := [
 const TUHK := [
 	"................",
 	"....KKKKKKKK....",
-	"...KKKKKKKKKK...",
+	"...KKKKkKKKKK...",
 	"...KKWWKKWWKK...",
 	"...KKWWKKWWKK...",
-	"...KKKKKKKKKK...",
+	"...KKkKKKKkKK...",
 	"....KKKKKKKK....",
 	"....KWWWWWWK....",
 	"....KWKWWKWK....",
@@ -337,27 +337,27 @@ const TUHK := [
 	"....KRKRRKRK....",
 	"....KKKKKKKK....",
 	"...KKkKKKKkKK...",
-	"...KKKKKKKKKK...",
+	"...KkKKKKKKkK...",
 	"....KKK..KKK....",
 	"....BB....BB....",
 ]
 const BOSS := [
-	"................",
-	"....GGGGGGGG....",
-	"...GGGGGGGGGG...",
-	"...GWGGGGGGWG...",
-	"...GWGGGGGGWG...",
-	"...GGGGGGGGGG...",
-	"....GGGGGGGG....",
-	".....CCCCCC.....",
-	"....CCCCCCCC....",
-	"...GGGGGGGGGG...",
-	"...GgGGGGGgGG...",
-	"...GgGGGGGgGG...",
-	"...GGGGGGGGGG...",
-	"...GGGG..GGGG...",
-	"...BB.....BB....",
-	"...BB.....BB....",
+	"....K..K..K.....",
+	"...KGK.KGK.KGK..",
+	"..KGGGGGGGGGGK..",
+	"..KGWGGGGGGWGK..",
+	"..KGWGGGGGGWGK..",
+	"..KGGGGGGGGGGK..",
+	"...KGGGGGGGGK...",
+	"....KCCCCCCK....",
+	"...KCCWCCWCCK...",
+	"..KGGGCWWCGGGK..",
+	"..KGgGCWWCgGGK..",
+	"..KGgGCWWCgGGK..",
+	"..KGGGCWWCGGGK..",
+	"...KGGK..KGGK...",
+	"...KBBK..KBBK...",
+	"...KBBK..KBBK...",
 ]
 const CRYS := [
 	"................",
@@ -452,20 +452,183 @@ const MELON := [
 const ARC_SLASH := [
 	"................",
 	".........WW.....",
-	".......WW.......",
-	"......WW........",
-	".....WW.........",
-	"....WW..........",
-	"....W...........",
-	"...WW...........",
-	"...WW...........",
-	"....W...........",
-	"....WW..........",
-	".....WW.........",
-	"......WW........",
-	".......WW.......",
+	".......WWWW.....",
+	"......WWWW......",
+	".....WWWW.......",
+	"....WWWW...W....",
+	"....WWW...WW....",
+	"...WWWW..WW.....",
+	"...WWWWWW.......",
+	"....WWWWW.......",
+	"....WWWW........",
+	"....WWWWW.......",
+	".....WWWWW......",
+	"......WWWWW.....",
+	".......WWWWW....",
 	".........WW.....",
+]
+# ---------------- cool pixelart cave (no obloid blobs) ----------------
+const CAVE_PAL := {
+	"k": Color("0b0b10"), "d": Color("1c1826"), "s": Color("322b42"),
+	"l": Color("574e6b"), "w": Color("8a80a0"), "g": Color("1e4423"),
+	"m": Color("4caf3a"), "y": Color("7a6a3a"), "r": Color("5a2a22"),
+	"o": Color("e08a2d"),
+}
+const FLOOR_A := [
+	"kkkkkkkkkkkkkkkk",
+	"kddssddssddssddk",
+	"kdsdsdsdsdsdsdsk",
+	"kssddssddrddssdk",
+	"kddssddsrddssddk",
+	"kdsgdsdsrsdsdsgk",
+	"kssddssrslssddsk",
+	"kddssdsrllssdddk",
+	"kdsdssrrllssdmdk",
+	"kssddsrrllssdmgk",
+	"kddssdsrllssggmk",
+	"kdsdsdsrslsggmsk",
+	"kssddssddssddsdk",
+	"kddssddssddssddk",
+	"kdsdsdsdsdsdsdsk",
+	"kkkkkkkkkkkkkkkk",
+]
+const FLOOR_B := [
+	"kkkkkkkkkkkkkkkk",
+	"kssddssddssddssk",
+	"ksdsdsdsdsdsdsdk",
+	"kddssddssddssddk",
+	"kssddssddssddsdk",
+	"kgmdsdsdsdsdssdk",
+	"kggmdsrddssddsdk",
+	"kddgmsrslssddssk",
+	"kssddsrllssddssk",
+	"kddssdrllssddssk",
+	"kdsdsdrllssddssk",
+	"kssddsrllsddrssk",
+	"kddssdrllsddrssk",
+	"kdsdsdsdsdsdrssk",
+	"kssddssddssddssk",
+	"kkkkkkkkkkkkkkkk",
+]
+const WALL_TEX := [
+	"llllllllllllllll",
+	"dddkdddkdddkdddk",
+	"dwdksddkydkdddkd",
+	"kkkkkkkkkkkkkkkk",
+	"dkdddkdddkdddkdd",
+	"dkdrdkdddkdddkdd",
+	"skdddkdddkdddkdd",
+	"kkkkkkkkkkkkkkkk",
+	"dddkdddkdddkdddk",
+	"dddkddokdddkdddk",
+	"dddkdddkdddkdddk",
+	"kkkkkkkkkkkkkkkk",
+	"dkdddkdddkdddkdd",
+	"dgddkgdddkdgdkdd",
+	"ggmgkgggkgmgkggm",
+	"kkkkkkkkkkkkkkkk",
+]
+const PILLAR_TEX := [
+	"kkddddddddddddkk",
+	"kkddssssssssddkk",
+	"kkddsllssllsddkk",
+	"kkddslwsswlsddkk",
+	"kkddslwsswlsddkk",
+	"kkddsllssllsddkk",
+	"kkddssrssrssddkk",
+	"kkddssrssrssddkk",
+	"kkddssrssrssddkk",
+	"kkddsllssllsddkk",
+	"kkddslwsswloddkk",
+	"kkddsllssllsddkk",
+	"kkddssssssssddkk",
+	"kkddgssssssgddkk",
+	"kkdggggmggmggdkk",
+	"kkddddddddddddkk",
+]
+const CEIL_TEX := [
+	"kkkkkkkkkkkkkkkk",
+	"kdkdkdkdkdkdkdkk",
+	"dddddddddddddddd",
+	"dddsddsddsddsddd",
+	"dsdsdsdsdsdsdsds",
+	"ddwddddwddddwddd",
+	"ddlddddllddddddd",
+	"ddkdddkdddkdddkd",
+	"dkdkdkdkdkdkdkdk",
+	"ddddrdddddrddddd",
+	"dsdsdsdsdsdsdsds",
+	"dddddddddddddddd",
+	"kdkdkdkdkdkdkdkk",
+	"kkkkkkkkkkkkkkkk",
+	"kkkkkkkkkkkkkkkk",
+	"kkkkkkkkkkkkkkkk",
+]
+const SPIKE_TEX := [
+	"DDDDDDDDDDDDDDDD",
+	"DDDDDDDDDDDDDDDD",
+	".W...W...W...W..",
+	".WS..WS..WS..WS.",
+	".WSs.WSs.WSs.WSs",
+	"WSsSWSsSWSsSWSsS",
+	"WSsSWSsSWSsSWSsS",
+	"sSSsRRRRRRRRsSSs",
+	"sSSsRWRRRRWRsSSs",
+	"sSSSrrrrrrrrSSSs",
+	"DDDDDDDDDDDDDDDD",
+	"DdDdDdDdDdDdDdDd",
+	"dDdDdDdDdDdDdDdD",
+	"DDDDDDDDDDDDDDDD",
+	"dDdDdDdDdDdDdDdD",
+	"DDDDDDDDDDDDDDDD",
+]
+const EXIT_TEX := [
+	"DDDDDDDDDDDDDDDD",
+	"DDggggggggggggDD",
+	"DggggGGGGGGggggD",
+	"DggGGGLLGGGGGLgD",
+	"DgGGGLWWLGGGGGGD",
+	"DgGGLWWWWLGGGGgD",
+	"DgGGLWWWWLGGGLgD",
+	"DgGGGLWWWLGgGLgD",
+	"DgGLGgWWWWLGGGgD",
+	"DgGGGLWWWLGGGLgD",
+	"DgGGGLWWLLGGGGgD",
+	"DgGGGGLWLLGGGLgD",
+	"DggGGGGLLLLGGGgD",
+	"DggggGGGGGGGGggD",
+	"DDggggggggggggDD",
+	"DDDDDDDDDDDDDDDD",
+]
+const COLLAR_TEX := [
+	"GgGgGgGgGgGgGgGg",
+	"GWGgGWGgGWGgGWGg",
+	"GgGGWRWRRRWGGGgG",
+	"gggggggggggggggg",
+]
+const SHADOW_PX := [
 	"................",
+	"................",
+	".....SSSSS......",
+	"...SSSSSSSS.....",
+	"..SSSSSSSSSS....",
+	"..SSSSSSSSSS....",
+	".SSSSSSSSSSSS...",
+	".SSSSSSSSSSSS...",
+	".SSSSSSSSSSSS...",
+	"..SSSSSSSSSS....",
+	"..SSSSSSSSSS....",
+	"...SSSSSSSS.....",
+	".....SSSSS......",
+	"................",
+	"................",
+	"................",
+]
+const RAIN_PX := [
+	".C.",
+	".C.",
+	".W.",
+	".C.",
 ]
 
 func _pixel_tex(rows: Array, pal: Dictionary) -> ImageTexture:
@@ -497,6 +660,7 @@ func _hero_pal() -> Dictionary:
 		"B": Color(0.35, 0.22, 0.12),
 		"K": Color(0.85, 0.88, 0.95), "N": Color(0.35, 0.23, 0.11),
 		"W": Color(1, 1, 1),
+		"X": Color(0.05, 0.04, 0.07), "w": Color(1.0, 0.82, 0.88),
 	}
 
 func _sprite3d(tex: Texture2D, pixel_size: float, y: float) -> Sprite3D:
@@ -512,13 +676,7 @@ func _sprite3d(tex: Texture2D, pixel_size: float, y: float) -> Sprite3D:
 func _get_shadow_tex() -> Texture2D:
 	if shadow_tex != null:
 		return shadow_tex
-	var img := Image.create(16, 16, false, Image.FORMAT_RGBA8)
-	for y in 16:
-		for x in 16:
-			var d := Vector2(x - 7.5, y - 7.5).length()
-			var a := clampf(1.0 - d / 8.0, 0.0, 1.0)
-			img.set_pixel(x, y, Color(0, 0, 0, a))
-	shadow_tex = ImageTexture.create_from_image(img)
+	shadow_tex = _pixel_tex(SHADOW_PX, {"S": Color(0, 0, 0, 1)})
 	return shadow_tex
 
 func _get_shadow_mat() -> StandardMaterial3D:
@@ -527,6 +685,7 @@ func _get_shadow_mat() -> StandardMaterial3D:
 	shadow_mat = StandardMaterial3D.new()
 	shadow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	shadow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	shadow_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	shadow_mat.albedo_color = Color(0, 0, 0, 0.55)
 	shadow_mat.albedo_texture = _get_shadow_tex()
 	return shadow_mat
@@ -553,10 +712,14 @@ func _poof(pos: Vector3, color: Color) -> void:
 	p.initial_velocity_min = 3.0
 	p.initial_velocity_max = 3.0
 	p.gravity = Vector3(0, -6, 0)
+	p.scale_amount_min = 0.8
+	p.scale_amount_max = 1.4
+	p.color_ramp = _poof_ramp(color)
 	var bm := BoxMesh.new()
-	bm.size = Vector3(0.12, 0.12, 0.12)
+	bm.size = Vector3(0.16, 0.16, 0.16)
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	m.albedo_color = color
 	bm.material = m
 	p.mesh = bm
@@ -567,14 +730,22 @@ func _poof(pos: Vector3, color: Color) -> void:
 	if tree != null:
 		tree.create_timer(1.2).timeout.connect(p.queue_free)
 
+func _poof_ramp(color: Color) -> Gradient:
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_color(1, color)
+	g.add_point(0.49, Color(1, 1, 1, 1))
+	g.add_point(0.51, color)
+	return g
+
 func _enemy_tex(etype: String, boss: bool) -> Array:
 	if boss:
-		return [BOSS, {"G": Color(1.0, 0.75, 0.15), "g": Color(0.6, 0.4, 0.08), "W": Color(1, 1, 1), "C": Color(0.8, 0.1, 0.1), "B": Color(0.15, 0.1, 0.08)}]
+		return [BOSS, {"G": Color(1.0, 0.75, 0.15), "g": Color(0.6, 0.4, 0.08), "W": Color(1, 1, 1), "C": Color(0.8, 0.1, 0.1), "B": Color(0.15, 0.1, 0.08), "K": Color(0.05, 0.03, 0.03)}]
 	if etype == "dash":
 		return [IMP_DASH, {"P": Color(0.63, 0.15, 0.95), "p": Color(0.35, 0.05, 0.55), "W": Color(1, 1, 1), "C": Color(0.4, 0.9, 1.0), "B": Color(0.12, 0.08, 0.14)}]
 	if etype == "tuhkanaama":
 		return [TUHK, {"K": Color(0.07, 0.07, 0.09), "k": Color(0.16, 0.15, 0.17), "W": Color(1, 1, 1), "R": Color(0.5, 0.08, 0.06), "B": Color(0.05, 0.05, 0.06)}]
-	return [IMP_CHASE, {"R": Color(0.85, 0.15, 0.12), "r": Color(0.5, 0.08, 0.08), "H": Color(1.0, 0.85, 0.4), "W": Color(1, 1, 1), "B": Color(0.15, 0.1, 0.12)}]
+	return [IMP_CHASE, {"R": Color(0.85, 0.15, 0.12), "r": Color(0.5, 0.08, 0.08), "H": Color(1.0, 0.85, 0.4), "W": Color(1, 1, 1), "B": Color(0.15, 0.1, 0.12), "K": Color(0.03, 0.02, 0.03)}]
 
 func _item_tex(kind: String) -> Array:
 	if kind == "heart":
@@ -1033,7 +1204,7 @@ func _enslave(e: Dictionary) -> void:
 	say("chain")
 
 func _add_collar(n: Node3D) -> void:
-	var collar := _box(Vector3(0.5, 0.12, 0.5), _mat(Color(1.0, 0.84, 0.0), Color(1.0, 0.84, 0.0), 1.0))
+	var collar := _box(Vector3(0.5, 0.12, 0.5), _tex_mat("collar", COLLAR_TEX, _collar_pal(), 0.6))
 	collar.position = Vector3(0, 1.32, 0)
 	n.add_child(collar)
 
@@ -1418,6 +1589,47 @@ func _box(size: Vector3, mat: Material) -> MeshInstance3D:
 	mi.mesh = bm
 	return mi
 
+func _pixel_mat(rows: Array, pal: Dictionary) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = _pixel_tex(rows, pal)
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	m.roughness = 1.0
+	m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	return m
+
+func _spike_pal() -> Dictionary:
+	return {
+		"W": Color(0.95, 0.97, 1.0), "S": Color(0.62, 0.66, 0.72),
+		"s": Color(0.32, 0.35, 0.42), "R": Color(1.0, 0.12, 0.08),
+		"r": Color(0.45, 0.05, 0.05), "D": Color(0.07, 0.07, 0.10),
+		"d": Color(0.16, 0.16, 0.20),
+	}
+
+func _exit_pal() -> Dictionary:
+	return {
+		"D": Color(0.04, 0.08, 0.06), "g": Color(0.05, 0.35, 0.16),
+		"G": Color(0.10, 0.75, 0.30), "L": Color(0.45, 1.0, 0.60),
+		"W": Color(1, 1, 1),
+	}
+
+func _collar_pal() -> Dictionary:
+	return {
+		"G": Color(1.0, 0.78, 0.18), "g": Color(0.55, 0.38, 0.08),
+		"W": Color(1, 1, 1), "R": Color(0.9, 0.08, 0.12),
+	}
+
+func _tex_mat(key: String, rows: Array, pal: Dictionary, emit_e: float) -> StandardMaterial3D:
+	var tex := _cached_tex(key, rows, pal)
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = tex
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	m.roughness = 0.9
+	m.emission_enabled = true
+	m.emission_texture = tex
+	m.emission = Color(1, 1, 1)
+	m.emission_energy_multiplier = emit_e
+	return m
+
 func _build_environment() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
@@ -1459,9 +1671,20 @@ func _build_environment() -> void:
 	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
 	pm.emission_box_extents = Vector3(14, 1, 14)
 	rain.process_material = pm
-	var streak := BoxMesh.new()
-	streak.size = Vector3(0.03, 0.5, 0.03)
-	streak.material = _mat(Color(0.6, 0.7, 0.85, 0.6))
+	var streak_tex: Texture2D = _cached_tex("rain", RAIN_PX, {
+		"W": Color(0.85, 0.93, 1.0, 1.0),
+		"C": Color(0.6, 0.7, 0.85, 1.0),
+	})
+	var streak := QuadMesh.new()
+	streak.size = Vector2(0.12, 0.6)
+	var smat := StandardMaterial3D.new()
+	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	smat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	smat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	smat.albedo_texture = streak_tex
+	smat.albedo_color = Color(1, 1, 1, 0.9)
+	streak.material = smat
 	rain.draw_pass_1 = streak
 	rain.visibility_aabb = AABB(Vector3(-16, -8, -16), Vector3(32, 16, 32))
 	add_child(rain)
@@ -1518,15 +1741,15 @@ func _build_room_nodes() -> void:
 	room_node.name = "Room"
 	add_child(room_node)
 	var floor_mats: Array = [
-		_mat(Color(0.23, 0.18, 0.15)),
-		_mat(Color(0.20, 0.155, 0.13)),
-		_mat(Color(0.17, 0.14, 0.11)),
-		_mat(Color(0.19, 0.155, 0.125)),
+		_pixel_mat(FLOOR_A, CAVE_PAL),
+		_pixel_mat(FLOOR_B, CAVE_PAL),
+		_pixel_mat(FLOOR_B, CAVE_PAL),
+		_pixel_mat(FLOOR_A, CAVE_PAL),
 	]
-	var ceil_m := _mat(Color(0.04, 0.04, 0.09))
-	var wall_m := _mat(Color(0.42, 0.35, 0.28))
-	var pillar_m := _mat(Color(0.35, 0.35, 0.4))
-	var spike_m := _mat(Color(0.24, 0.24, 0.29), Color(0.8, 0.1, 0.1), 0.8)
+	var ceil_m := _pixel_mat(CEIL_TEX, CAVE_PAL)
+	var wall_m := _pixel_mat(WALL_TEX, CAVE_PAL)
+	var pillar_m := _pixel_mat(PILLAR_TEX, CAVE_PAL)
+	var spike_m := _tex_mat("spike", SPIKE_TEX, _spike_pal(), 1.6)
 	# one big floor slab for collision
 	var static_body := StaticBody3D.new()
 	static_body.collision_layer = 1
@@ -1578,7 +1801,7 @@ func _build_room_nodes() -> void:
 			elif ch == "E":
 				exit_node = Area3D.new()
 				exit_node.position = Vector3(wx, 0.0, wz)
-				var pillar := _box(Vector3(1.0, WALL_H, 1.0), _mat(Color(0.1, 0.5, 0.3), Color(0.1, 1.0, 0.4), 1.2))
+				var pillar := _box(Vector3(1.0, WALL_H, 1.0), _tex_mat("exit", EXIT_TEX, _exit_pal(), 1.2))
 				pillar.position = Vector3(0, WALL_H / 2.0, 0)
 				exit_node.add_child(pillar)
 				exit_light = OmniLight3D.new()
