@@ -1,0 +1,26 @@
+; Engine configuration file.
+; Caterpillar: Knife of the Mother 3D — Godot 4 remake.
+; GDScript only, GL Compatibility renderer (web-safe).
+
+config_version=5
+
+[application]
+
+config/name="Caterpillar: Knife of the Mother 3D"
+config/description="Seeded caves. Modifiers. Permadeath. No tears. Only knife."
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1152
+window/size/viewport_height=648
+window/stretch/mode="canvas_items"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.02, 0.02, 0.05, 1)

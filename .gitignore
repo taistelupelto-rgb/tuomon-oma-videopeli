@@ -1,0 +1,7 @@
+# Godot generated
+.godot/
+build/
+# Godot web export staging
+caterpillar-godot-web-*.zip
+# Single-file legacy build copies
+caterpillar-knife-of-the-mother-*.html

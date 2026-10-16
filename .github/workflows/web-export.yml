@@ -1,0 +1,75 @@
+name: web-export
+
+# Godot web pipeline: on version tag, export the project to HTML5
+# and attach the playable zip to the GitHub release.
+# Manual: workflow_dispatch with an existing tag name.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and attach (e.g. v0.16.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  export-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot editor + export templates
+        run: |
+          set -e
+          mkdir -p "$HOME/godot" "$HOME/.local/share/godot/export_templates"
+          cd "$HOME/godot"
+          gh release download "${GODOT_VERSION}-stable" \
+            --repo godotengine/godot \
+            --pattern "Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          gh release download "${GODOT_VERSION}-stable" \
+            --repo godotengine/godot \
+            --pattern "Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q -o "Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q -o "Godot_v${GODOT_VERSION}-stable_export_templates.tpz" \
+            -d "$HOME/.local/share/godot/export_templates/"
+          mv "$HOME/.local/share/godot/export_templates/templates" \
+             "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          ls "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/" | grep -i web
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Import + export web
+        run: |
+          set -e
+          BIN="$HOME/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          chmod +x "$BIN"
+          "$BIN" --headless --path . --import
+          mkdir -p build/web
+          "$BIN" --headless --path . --export-release Web build/web/index.html
+          ls -la build/web
+
+      - name: Zip + attach to release
+        run: |
+          set -e
+          TAG="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          fi
+          ZIP="caterpillar-godot-web-${TAG}.zip"
+          (cd build/web && zip -qr "../../$ZIP" .)
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --notes "Godot web remake." "$ZIP"
+          else
+            gh release upload "$TAG" "$ZIP" --clobber
+          fi
+          gh release view "$TAG"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
