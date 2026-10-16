@@ -79,6 +79,7 @@ const SFX_WARDEN := preload("res://assets/sfx/warden_down.ogg")
 const VOICE_TEXT := preload("res://assets/voices/voices_text.gd")
 const MUSIC_STREAM := preload("res://assets/music.mp3")
 const DMG_YELL := preload("res://assets/voices/dmg_yell_01.ogg")
+const FOE_YELL := preload("res://assets/voices/foe_yell_01.ogg")
 const ENEMY_LOOK := preload("res://assets/diarra.jpg")
 
 const VOICE_COUNTS := {"room_a": 8, "room_b": 8, "room_c": 8, "room_d": 8,
@@ -170,6 +171,7 @@ var sfx_players: Array = []
 var sfx_i := 0
 var music_player: AudioStreamPlayer
 var dmg_yell_player: AudioStreamPlayer
+var foe_yell_player: AudioStreamPlayer
 var autoplay := false
 var auto_t := 0
 var inventory: Array = [] # slots: {kind, count}. persists rooms, dies on new run.
@@ -1422,6 +1424,7 @@ func _knife_hits() -> void:
 		combo += 1
 		combo_t = 3.0
 		play_sfx(SFX_HIT)
+		foe_yell()
 		if e["type"] == "tuhkanaama" and int(e["hp"]) <= 0:
 			_enslave(e) # the soot-face cannot die. It kneels.
 			continue
@@ -2618,6 +2621,11 @@ func _build_audio() -> void:
 	dmg_yell_player.stream = DMG_YELL
 	dmg_yell_player.volume_db = -4.0
 	add_child(dmg_yell_player)
+	# the foe's cry when knifed: same treatment, every landed hit
+	foe_yell_player = AudioStreamPlayer.new()
+	foe_yell_player.stream = FOE_YELL
+	foe_yell_player.volume_db = -4.0
+	add_child(foe_yell_player)
 
 func music_play() -> void:
 	if music_player != null and not music_player.playing:
@@ -2631,6 +2639,11 @@ func damage_yell() -> void:
 	if state != "play" or dmg_yell_player == null:
 		return
 	dmg_yell_player.play()
+
+func foe_yell() -> void:
+	if state != "play" or foe_yell_player == null:
+		return
+	foe_yell_player.play()
 
 func play_sfx(stream: AudioStream) -> void:
 	var p: AudioStreamPlayer = sfx_players[sfx_i]
