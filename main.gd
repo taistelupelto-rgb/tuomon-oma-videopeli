@@ -13,6 +13,8 @@ const WALK_SPEED := 5.2
 const TURN_SPEED := 2.6
 const KNIFE_RANGE := 3.0
 const KNIFE_ARC := 1.0 # radians, half-angle
+const CAM_PITCH_MIN := -0.2
+const CAM_PITCH_MAX := 0.45
 
 const ROOM_DEFS := [
 	{"name": "ROOM A — SPAWN CAVE", "about": "Grab the crystal, find the glowing exit. Every run, a new cave.", "pillars": 2, "crys": 1, "en": 0, "spikes": 0, "elites": 0, "heart": false, "sharp": false},
@@ -98,7 +100,7 @@ var leg_r: Node3D
 var arm_r: Node3D
 var knife_blade: MeshInstance3D
 var yaw := 0.0
-var cam_pitch := -0.25
+var cam_pitch := -0.2
 var walk_phase := 0.0
 var attack_t := 0.0
 var attack_cd := 0.0
@@ -395,8 +397,8 @@ func _input(event: InputEvent) -> void:
 			joy_vec = d
 			touch_move = d
 		elif event.index == look_id:
-			yaw -= event.relative.x * 0.006
-			cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, -0.9, 0.9)
+			yaw -= event.relative.x * 0.0025
+			cam_pitch = clampf(cam_pitch + event.relative.y * 0.0018, CAM_PITCH_MIN, CAM_PITCH_MAX)
 			look_last = event.position
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -411,7 +413,7 @@ func _input(event: InputEvent) -> void:
 		var vp2 := get_viewport().get_visible_rect().size
 		if state == "play" and not paused_game and event.position.x > vp2.x * 0.5:
 			yaw -= event.relative.x * 0.006
-			cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, -0.9, 0.9)
+			cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		var k: int = event.physical_keycode
@@ -460,9 +462,9 @@ func _physics_process(delta: float) -> void:
 			yaw = atan2(-(fp.x - player_node.position.x), -(fp.z - player_node.position.z))
 	yaw += turn * TURN_SPEED * delta
 	if Input.is_physical_key_pressed(KEY_Q):
-		cam_pitch = min(0.9, cam_pitch + 1.2 * delta)
+		cam_pitch = min(CAM_PITCH_MAX, cam_pitch + 1.2 * delta)
 	if Input.is_physical_key_pressed(KEY_E):
-		cam_pitch = max(-0.9, cam_pitch - 1.2 * delta)
+		cam_pitch = max(CAM_PITCH_MIN, cam_pitch - 1.2 * delta)
 	# --- move ---
 	var fwd := 0.0
 	var strafe := 0.0
