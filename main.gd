@@ -106,6 +106,8 @@ var combo_t := 0.0
 var knife_dmg := 1
 var speed_bonus := 0.0
 var iframes := 0.0
+var dmg_flash := 0.0
+var dmg_rect: ColorRect
 var tick := 0
 
 var grid: Array = []
@@ -1176,11 +1178,18 @@ func _input(event: InputEvent) -> void:
 			_refresh_overlays()
 		elif k == KEY_C and state == "play":
 			codex_panel.visible = not codex_panel.visible
+		elif k == KEY_M:
+			AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
+			announce("Muted" if AudioServer.is_bus_mute(0) else "Sound on")
 		elif state == "play" and not paused_game and k >= KEY_1 and k <= KEY_8:
 			inv_use(k - KEY_1)
 
 func _process(delta: float) -> void:
 	tick += 1
+	if dmg_flash > 0.0:
+		dmg_flash = maxf(0.0, dmg_flash - delta * 2.0)
+	if is_instance_valid(dmg_rect):
+		dmg_rect.color = Color(1, 0.1, 0.1, 0.35 * clampf(dmg_flash, 0.0, 1.0))
 	if tick % 60 == 0:
 		var s := get_viewport().get_visible_rect().size
 		cam.fov = 88.0 if s.y > s.x else 70.0
@@ -1457,6 +1466,9 @@ func _enemy_update(delta: float) -> void:
 		else:
 			n.velocity.x = dir.x * sp
 			n.velocity.z = dir.y * sp
+		if cell_at_world(n.position) == "w":
+			n.velocity.x *= 0.55
+			n.velocity.z *= 0.55
 		var _spr: Sprite3D = e.get("sprite")
 		if _spr != null:
 			if float(e.get("flash", 0.0)) > 0.0:
@@ -1560,6 +1572,9 @@ func _chain_follow(e: Dictionary, n: CharacterBody3D, delta: float) -> void:
 	if nc == "#" or nc == "P":
 		n.velocity.x = 0.0
 		n.velocity.z = 0.0
+	if cell_at_world(n.position) == "w":
+		n.velocity.x *= 0.55
+		n.velocity.z *= 0.55
 	if not n.is_on_floor():
 		n.velocity.y -= 22.0 * delta
 	else:
@@ -1719,6 +1734,8 @@ func hurt(src: String) -> void:
 		hp = maxi(hp, 2) # smoke hook: the bot must survive to prove the win path
 	hp -= 1
 	iframes = 1.2
+	dmg_flash = 1.0
+	cam_pitch = clampf(cam_pitch + 0.02, CAM_PITCH_MIN, CAM_PITCH_MAX)
 	combo = 0
 	play_sfx(SFX_HURT)
 	if hp <= 0:
@@ -2175,7 +2192,7 @@ func _build_hud() -> void:
 	minimap.offset_bottom = 156
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. Left thumb move, right thumb look, KNIFE hold to slash.")
+	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. Left thumb move, right thumb look, KNIFE hold to slash, M mute.")
 	var title_tex := TextureRect.new()
 	title_tex.texture = load("res://assets/caterpillar.png") as Texture2D
 	title_tex.custom_minimum_size = Vector2(560, 180)
@@ -2198,6 +2215,13 @@ func _build_hud() -> void:
 	pause_label.add_theme_font_size_override("font_size", 28)
 	pause_label.visible = false
 	layer.add_child(pause_label)
+	var _dmg := ColorRect.new()
+	_dmg.name = "DmgFlash"
+	_dmg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_dmg.color = Color(1, 0.1, 0.1, 0)
+	_dmg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(_dmg)
+	dmg_rect = _dmg
 	_build_touch()
 
 func _overlay(layer: CanvasLayer, title: String, body: String, btn_text: String = "TAP TO START / CONTINUE") -> PanelContainer:
