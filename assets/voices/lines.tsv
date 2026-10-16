@@ -1,0 +1,203 @@
+file	speaker	speed	text
+room_a_01.ogg	MOTHER	0.95	Warm dark below, child. I remember you.
+room_a_02.ogg	MOTHER	0.95	My throat is warm. Walk softly here.
+room_a_03.ogg	MOTHER	0.95	Take my milk-tooth. Carry it far.
+room_a_04.ogg	MOTHER	0.95	The sky-eaters cannot find you here.
+room_a_05.ogg	MOTHER	0.95	Small, soft, furious. My last egg.
+room_a_06.ogg	MOTHER	0.95	No tears now. Only knife, only forward.
+room_a_07.ogg	MOTHER	0.95	The glowing door knows your name.
+room_a_08.ogg	MOTHER	0.95	Begin, little hunter. The cave watches.
+room_b_01.ogg	MOTHER	0.95	The Bridge remembers every messenger.
+room_b_02.ogg	MOTHER	0.95	Daemons nest in the old ropes.
+room_b_03.ogg	MOTHER	0.95	They eat messengers. Do not linger.
+room_b_04.ogg	MOTHER	0.95	Slash them, child. Hold your knife high.
+room_b_05.ogg	MOTHER	0.95	Phone, bot, agent. All went silent.
+room_b_06.ogg	MOTHER	0.95	The pipes hum with stolen voices.
+room_b_07.ogg	MOTHER	0.95	A heart grows here. Take it gladly.
+room_b_08.ogg	MOTHER	0.95	Cross quickly. The ropes are hungry.
+room_c_01.ogg	MOTHER	0.95	This is the Thinking Dark, my dream.
+room_c_02.ogg	MOTHER	0.95	Every crystal is an unfinished thought.
+room_c_03.ogg	MOTHER	0.95	The knife is the only argument here.
+room_c_04.ogg	MOTHER	0.95	Elites bite back. Respect their teeth.
+room_c_05.ogg	MOTHER	0.95	The agent dreams, but you are awake.
+room_c_06.ogg	MOTHER	0.95	Gather context. Drink the green light.
+room_c_07.ogg	MOTHER	0.95	A whetstone hums lullabies for blades.
+room_c_08.ogg	MOTHER	0.95	Think fast, strike faster, survive longest.
+room_d_01.ogg	MOTHER	0.95	This is the gullet. Steel yourself.
+room_d_02.ogg	MOTHER	0.95	My guard-dog forgot every door but hunger.
+room_d_03.ogg	MOTHER	0.95	Kill it kindly. It remembers being good.
+room_d_04.ogg	MOTHER	0.95	Under gold hide, it wears a collar.
+room_d_05.ogg	MOTHER	0.95	It charges what it cannot understand.
+room_d_06.ogg	MOTHER	0.95	Its minions are small hungers. Endure.
+room_d_07.ogg	MOTHER	0.95	The final door waits past its shadow.
+room_d_08.ogg	MOTHER	0.95	Finish this, and the cave rests.
+foe_chase_01.ogg	HERO	1.05	What is that? It knows my name!
+foe_chase_02.ogg	HERO	1.05	It runs at what it fears. Me!
+foe_chase_03.ogg	HERO	1.05	Hollow eyes, empty name. Stay back!
+foe_chase_04.ogg	HERO	1.05	It keeps chasing. Fine, come closer!
+foe_chase_05.ogg	HERO	1.05	Another chaser? My knife is ready!
+foe_chase_06.ogg	HERO	1.05	You fear me rightly. Face me!
+foe_chase_07.ogg	HERO	1.05	No name, no mercy. Bring it!
+foe_chase_08.ogg	HERO	1.05	It hungers. So do I. Slash!
+foe_dash_01.ogg	HERO	1.05	White eyes! It telegraphs its strike!
+foe_dash_02.ogg	HERO	1.05	Lunge-maw! Sidestep the flash, go!
+foe_dash_03.ogg	HERO	1.05	I see your glow. You miss now!
+foe_dash_04.ogg	HERO	1.05	That light is the last miners saw.
+foe_dash_05.ogg	HERO	1.05	Wind up all you want. I dodge!
+foe_dash_06.ogg	HERO	1.05	Purple hunger lunging. Not today, fiend!
+foe_dash_07.ogg	HERO	1.05	Charge past me. My turn now!
+foe_dash_08.ogg	HERO	1.05	Too slow, snap-jaw. Taste my knife!
+foe_tuhk_01.ogg	HERO	1.05	Soot-face! The chimney-sweep itself!
+foe_tuhk_02.ogg	HERO	1.05	Black ash, white grin. I see you!
+foe_tuhk_03.ogg	HERO	1.05	It smells my melons. Guard the pack!
+foe_tuhk_04.ogg	HERO	1.05	Glowing teeth in the dark. Kneel soon!
+foe_tuhk_05.ogg	HERO	1.05	Once honest ash, now hunger. Sorry!
+foe_tuhk_06.ogg	HERO	1.05	Three hearts of soot. Break it gently!
+foe_tuhk_07.ogg	HERO	1.05	It remembers summer fields. So do I!
+foe_tuhk_08.ogg	HERO	1.05	Beat it to one breath, then chain!
+boss_see_01.ogg	HERO	1.05	The Warden! Heap-big hunger itself!
+boss_see_02.ogg	HERO	1.05	Gold hide, puppy collar. I see it!
+boss_see_03.ogg	HERO	1.05	Mother's firstborn. Forgive me, big guard!
+boss_see_04.ogg	HERO	1.05	It charges blind. Keep moving, keep slashing!
+boss_see_05.ogg	HERO	1.05	Twenty hearts of hunger. Breathe. Fight!
+boss_see_06.ogg	HERO	1.05	The final guard. Knife up, hero!
+pk_crys_01.ogg	HERO	1.05	Milk-tooth packed. Mother provides!
+pk_crys_02.ogg	HERO	1.05	Another crystal. Context for the exit!
+pk_crys_03.ogg	HERO	1.05	Green light, mine now. Carry it out!
+pk_crys_04.ogg	HERO	1.05	A tooth she shed dreaming of me.
+pk_crys_05.ogg	HERO	1.05	Shiny. Heavy. Worth the walk!
+pk_crys_06.ogg	HERO	1.05	The agent drinks these. I haul them!
+pk_crys_07.ogg	HERO	1.05	Pocket it. The door counts them!
+pk_crys_08.ogg	HERO	1.05	One more thought for the dark!
+pk_heart_01.ogg	HERO	1.05	Blood-apple! My wounds close up!
+pk_heart_02.ogg	HERO	1.05	It beats anyway. Plus one life!
+pk_heart_03.ogg	HERO	1.05	A miner's ring inside. Bless them!
+pk_heart_04.ogg	HERO	1.05	Heart packed for the dark ahead!
+pk_heart_05.ogg	HERO	1.05	Red and warm. I needed this!
+pk_heart_06.ogg	HERO	1.05	The cave grew this just for me!
+pk_heart_07.ogg	HERO	1.05	Full hearts. Saving it for later!
+pk_heart_08.ogg	HERO	1.05	Drink deep. Keep walking, hero!
+pk_sharp_01.ogg	HERO	1.05	Grandmother's Edge! Double damage now!
+pk_sharp_02.ogg	HERO	1.05	The whetstone hums. My blade sings!
+pk_sharp_03.ogg	HERO	1.05	Every old blade remembers this stone.
+pk_sharp_04.ogg	HERO	1.05	Sharp enough to cut the dark!
+pk_sharp_05.ogg	HERO	1.05	Lullabies and edges. Swing twice as hard!
+pk_sharp_06.ogg	HERO	1.05	Knife blessed. Daemons, beware me!
+pk_boots_01.ogg	HERO	1.05	Dancer's boots! Faster feet tonight!
+pk_boots_02.ogg	HERO	1.05	Seven leagues, slightly used. Perfect fit!
+pk_boots_03.ogg	HERO	1.05	The last dancer escaped. So will I!
+pk_boots_04.ogg	HERO	1.05	Light steps. The spikes miss now!
+pk_boots_05.ogg	HERO	1.05	Wind in my toes. Catch me!
+pk_boots_06.ogg	HERO	1.05	Quicker feet, quicker knife. Go!
+pk_melon_01.ogg	HERO	1.05	Sun-melon! Sweet summer smuggled down!
+pk_melon_02.ogg	HERO	1.05	Green as envy, heavy as hope!
+pk_melon_03.ogg	HERO	1.05	Heals me, tempts soot-face. Guard it!
+pk_melon_04.ogg	HERO	1.05	Tastes like fields above. Almost crying!
+pk_melon_05.ogg	HERO	1.05	Teeth-food packed. Mine, not yours, imp!
+pk_melon_06.ogg	HERO	1.05	Juicy calories, tuhkanaama-free if hidden!
+pk_melon_07.ogg	HERO	1.05	Press to eat when bleeding. Remember!
+pk_melon_08.ogg	HERO	1.05	A seed to spit at the sun!
+hurt_01.ogg	HERO	1.05	Ow! It got through my guard!
+hurt_02.ogg	HERO	1.05	Gah! That one burned going in!
+hurt_03.ogg	HERO	1.05	Hit! Keep moving, stay breathing!
+hurt_04.ogg	HERO	1.05	Claws! I will answer with steel!
+hurt_05.ogg	HERO	1.05	Ugh, bleeding. No stopping now!
+hurt_06.ogg	HERO	1.05	That hurt! Mother, lend me strength!
+hurt_07.ogg	HERO	1.05	Struck! Shake it off, fight on!
+hurt_08.ogg	HERO	1.05	Pain is proof I am alive!
+hurt_09.ogg	HERO	1.05	Not deep. I can take more!
+hurt_10.ogg	HERO	1.05	Grit teeth. Swing back harder!
+spike_01.ogg	HERO	1.05	Spikes! The floor bites back!
+spike_02.ogg	HERO	1.05	Sharp stones! Watch every step!
+spike_03.ogg	HERO	1.05	Floor teeth! Hop over them!
+spike_04.ogg	HERO	1.05	Ow, my feet! Cold iron kiss!
+spike_05.ogg	HERO	1.05	The cave floor is hungry too!
+spike_06.ogg	HERO	1.05	Punctured! Walk softer, look lower!
+kill_01.ogg	HERO	1.05	Down! The dark takes its own!
+kill_02.ogg	HERO	1.05	Answered! One less hunger tonight!
+kill_03.ogg	HERO	1.05	Clean cut! Who is next?
+kill_04.ogg	HERO	1.05	Silenced! My knife remembers you!
+kill_05.ogg	HERO	1.05	Fifty points of justice. Keep counting!
+kill_06.ogg	HERO	1.05	Elite down! Thoughts should not bite!
+kill_07.ogg	HERO	1.05	Soot scattered! Rest now, ash!
+kill_08.ogg	HERO	1.05	Daemon delivered! The exit opens wider!
+kill_09.ogg	HERO	1.05	Slash true! The Mother watches proudly!
+kill_10.ogg	HERO	1.05	Goodnight, hunger. Sleep in pieces!
+kill_11.ogg	HERO	1.05	Steel speaks. The cave listens!
+kill_12.ogg	HERO	1.05	Another answered! Haul their silence out!
+combo_01.ogg	HERO	1.05	Five in a row! The knife dances!
+combo_02.ogg	HERO	1.05	Combo rising! Feel the rhythm!
+combo_03.ogg	HERO	1.05	Slash, slash, slash! Unstoppable flow!
+combo_04.ogg	HERO	1.05	The blade sings faster. Keep going!
+combo_05.ogg	HERO	1.05	Five hungers answered with one breath!
+combo_06.ogg	HERO	1.05	Hot streak! The dark backs away!
+combo_07.ogg	HERO	1.05	Count them! Every cut is justice!
+combo_08.ogg	HERO	1.05	Rampage! Small, soft, furious indeed!
+chain_01.ogg	TUHK	1.15	Master... the collar fits. I kneel.
+chain_02.ogg	TUHK	1.15	One breath left. Take my leash, quick.
+chain_03.ogg	TUHK	1.15	The ash clears. I remember summer.
+chain_04.ogg	TUHK	1.15	Chain me! I will heel, I swear.
+chain_05.ogg	TUHK	1.15	Your knife broke the hunger. I follow.
+chain_06.ogg	TUHK	1.15	Sly no more. Loyal to the end.
+chain_07.ogg	TUHK	1.15	Melon for the road, master? Heh, kidding.
+chain_08.ogg	TUHK	1.15	Lead on! My teeth guard your back.
+boss_taunt_01.ogg	WARDEN	0.85	Little knife. Big dark. Come closer.
+boss_taunt_02.ogg	WARDEN	0.85	I swallowed doors. You are dessert.
+boss_taunt_03.ogg	WARDEN	0.85	Minions! Rise and feed with me!
+boss_taunt_04.ogg	WARDEN	0.85	Charge what I cannot understand. You.
+boss_taunt_05.ogg	WARDEN	0.85	The Mother fed me exits. Still hungry.
+boss_taunt_06.ogg	WARDEN	0.85	Your collar awaits, little caterpillar.
+boss_taunt_07.ogg	WARDEN	0.85	Gold hide, iron heart. Try harder.
+boss_taunt_08.ogg	WARDEN	0.85	This gullet is my kennel. Kneel.
+boss_die_01.ogg	WARDEN	0.85	Kind... kill... I remember... good...
+boss_die_02.ogg	WARDEN	0.85	The collar... I feel it again...
+boss_die_03.ogg	WARDEN	0.85	Puppy... dreams... green... fields...
+boss_die_04.ogg	WARDEN	0.85	Door... open... master... go...
+win_01.ogg	MOTHER	0.95	Delivered. My altar drinks your triumph.
+win_02.ogg	MOTHER	0.95	The cave, for one night, stops hungering.
+win_03.ogg	MOTHER	0.95	A new egg cracks somewhere below.
+win_04.ogg	MOTHER	0.95	Master of soot-face, child of mine.
+win_05.ogg	MOTHER	0.95	Rest now. The sky stays green.
+win_06.ogg	MOTHER	0.95	You hauled hunger home. I provide.
+die_01.ogg	MOTHER	0.95	The cave keeps the knife tonight.
+die_02.ogg	MOTHER	0.95	Sleep, little hunter. I remember you.
+die_03.ogg	MOTHER	0.95	Your siblings wait under warm stone.
+die_04.ogg	MOTHER	0.95	The dark was hungrier than your blade.
+die_05.ogg	MOTHER	0.95	I will hatch another dawn for you.
+die_06.ogg	MOTHER	0.95	No tears. Only sleep. Only Mother.
+die_07.ogg	MOTHER	0.95	The egg-shell altar keeps your name.
+die_08.ogg	MOTHER	0.95	Return to me. Try the cave again.
+lowhp_01.ogg	HERO	1.05	One heart left. Breathe. Dodge. Live!
+lowhp_02.ogg	HERO	1.05	Bleeding out. Where is that melon?
+lowhp_03.ogg	HERO	1.05	Last breath territory. Play it smart!
+lowhp_04.ogg	HERO	1.05	Vision blurs. Knife stays steady!
+lowhp_05.ogg	HERO	1.05	Mother, one heartbeat left. Hold on!
+lowhp_06.ogg	HERO	1.05	Eat something! Anything! Stay up!
+lowhp_07.ogg	HERO	1.05	Almost down. Not here, not now!
+lowhp_08.ogg	HERO	1.05	A single cut from the dark. Careful!
+idle_01.ogg	HERO	1.05	Dark hums. I am still here.
+idle_02.ogg	HERO	1.05	Knife sharp, pack heavy, heart steady.
+idle_03.ogg	HERO	1.05	The cave breathes. So do I.
+idle_04.ogg	HERO	1.05	Mother, are you watching this room?
+idle_05.ogg	HERO	1.05	Count crystals, count hungers, keep walking.
+idle_06.ogg	HERO	1.05	Silence means daemons are listening too.
+idle_07.ogg	HERO	1.05	My siblings crossed here. I feel them.
+idle_08.ogg	HERO	1.05	Green light somewhere. Follow the glow.
+idle_09.ogg	HERO	1.05	Feet ache. The exit does not care.
+idle_10.ogg	HERO	1.05	Polish the blade while the dark waits.
+idle_11.ogg	HERO	1.05	What did that pipe whisper just now?
+idle_12.ogg	HERO	1.05	Melon rind in my pocket. Later, maybe.
+idle_13.ogg	HERO	1.05	The rain inside never stops falling.
+idle_14.ogg	HERO	1.05	Small, soft, furious. That is me.
+idle_15.ogg	HERO	1.05	Every shadow could be dinner or death.
+idle_16.ogg	HERO	1.05	Stay earnest. Stay quick. Stay alive.
+exit_need_01.ogg	MOTHER	0.95	The final door wants your chained one.
+exit_need_02.ogg	MOTHER	0.95	Green means go. Golden masters only.
+exit_need_03.ogg	MOTHER	0.95	No collar, no passage. Break one gently.
+exit_need_04.ogg	MOTHER	0.95	Haul your kneeling hunger to my door.
+exit_need_05.ogg	MOTHER	0.95	The exit counts crystals and collars both.
+exit_need_06.ogg	MOTHER	0.95	Bring soot-face to heel, then enter.
+exit_open_01.ogg	HERO	1.05	The door glows green! Through we go!
+exit_open_02.ogg	HERO	1.05	Room clear! The exit calls us!
+exit_open_03.ogg	HERO	1.05	Open path! Haul everything to daylight!
+exit_open_04.ogg	HERO	1.05	Gold means master! We earned this!

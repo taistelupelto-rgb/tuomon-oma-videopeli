@@ -74,6 +74,17 @@ const SFX_DEATH := preload("res://assets/sfx/game_over.ogg")
 const SFX_CHAINED := preload("res://assets/sfx/chained.ogg")
 const SFX_WARDEN := preload("res://assets/sfx/warden_down.ogg")
 
+const VOICE_COUNTS := {"room_a": 8, "room_b": 8, "room_c": 8, "room_d": 8,
+	"foe_chase": 8, "foe_dash": 8, "foe_tuhk": 8, "boss_see": 6,
+	"pk_crys": 8, "pk_heart": 8, "pk_sharp": 6, "pk_boots": 6, "pk_melon": 8,
+	"hurt": 10, "spike": 6, "kill": 12, "combo": 8, "chain": 8,
+	"boss_taunt": 8, "boss_die": 4, "win": 6, "die": 8,
+	"lowhp": 8, "idle": 16, "exit_need": 6, "exit_open": 4}
+var voice_bank := {}
+var voice_cache := {}
+var voice_cd := 0.0
+var exit_voiced := -1
+
 var state := "title" # title | play | dead | win
 var paused_game := false
 var seed_value := 1
@@ -161,7 +172,33 @@ func _ready() -> void:
 	_build_player()
 	_build_hud()
 	_build_audio()
+	_build_voice_bank()
 	show_title()
+
+func _build_voice_bank() -> void:
+	for cat in VOICE_COUNTS:
+		var arr: Array = []
+		for i in range(1, int(VOICE_COUNTS[cat]) + 1):
+			arr.append("%s_%02d.ogg" % [cat, i])
+		voice_bank[cat] = arr
+
+func say(cat: String) -> void:
+	if state != "play" or voice_cd > 0.0:
+		return
+	if not voice_bank.has(cat) or (voice_bank[cat] as Array).is_empty():
+		return
+	var bank: Array = voice_bank[cat]
+	var f: String = bank[rng.randi_range(0, bank.size() - 1)]
+	var stream: AudioStream
+	if voice_cache.has(f):
+		stream = voice_cache[f]
+	else:
+		stream = load("res://assets/voices/" + f) as AudioStream
+		if stream == null:
+			return
+		voice_cache[f] = stream
+	voice_cd = 5.0
+	play_sfx(stream)
 
 # ---------------- run / rooms ----------------
 
@@ -178,6 +215,8 @@ func start_run(new_seed: int) -> void:
 	speed_bonus = 0.0
 	seen = {}
 	inventory.clear()
+	voice_cd = 0.0
+	exit_voiced = -1
 	touch_move = Vector2.ZERO
 	touch_slash = false
 	joy_id = -1
@@ -217,6 +256,7 @@ func _load_room(idx: int, keep_chained := true) -> void:
 	if idx == 3:
 		play_sfx(SFX_FINAL)
 		announce("FINAL ROUND — " + d["about"])
+	say("room_" + ["a", "b", "c", "d"][idx])
 
 func _gen_grid() -> void:
 	var d: Dictionary = ROOM_DEFS[ri]
@@ -444,6 +484,8 @@ func _process(delta: float) -> void:
 		cap_t -= delta
 		if cap_t <= 0.0:
 			hud_cap.text = ""
+	if tick % 1800 == 0:
+		say("idle")
 	if autoplay:
 		_autoplay(delta)
 
@@ -523,6 +565,8 @@ func _physics_process(delta: float) -> void:
 			combo = 0
 	if spike_cd > 0.0:
 		spike_cd -= delta
+	if voice_cd > 0.0:
+		voice_cd -= delta
 	# --- knife ---
 	var slashing := Input.is_physical_key_pressed(KEY_SPACE) or touch_slash or autoplay
 	if slashing and attack_cd <= 0.0:
@@ -570,6 +614,8 @@ func _knife_hits() -> void:
 		if e["type"] == "tuhkanaama" and int(e["hp"]) <= 0:
 			_enslave(e) # the soot-face cannot die. It kneels.
 			continue
+		if combo == 5:
+			say("combo")
 		if int(e["hp"]) <= 0:
 			_kill_enemy(e)
 
@@ -581,6 +627,7 @@ func _enslave(e: Dictionary) -> void:
 	play_sfx(SFX_CHAINED)
 	_add_collar(e["node"] as Node3D)
 	announce("CHAINED! The tuhkanaama kneels. Haul it to the final exit.")
+	say("chain")
 
 func _add_collar(n: Node3D) -> void:
 	var collar := _box(Vector3(0.5, 0.12, 0.5), _mat(Color(1.0, 0.84, 0.0), Color(1.0, 0.84, 0.0), 1.0))
@@ -617,6 +664,9 @@ func _kill_enemy(e: Dictionary) -> void:
 	if e["boss"]:
 		announce("WARDEN DOWN! Reach the glowing exit.")
 		play_sfx(SFX_WARDEN)
+		say("boss_die")
+	else:
+		say("kill")
 
 func _enemy_update(delta: float) -> void:
 	var pp := player_node.position
@@ -705,6 +755,7 @@ func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, de
 				alive += 1
 		if alive < 6:
 			_spawn_minion(n.position)
+			say("boss_taunt")
 
 func _nearest_melon(from: Vector3) -> Dictionary:
 	var best := {}
@@ -829,6 +880,7 @@ func _pickup_update() -> void:
 			score += 100
 			play_sfx(SFX_COIN)
 			announce("Crystal packed (%d left out there)." % _crystals_left())
+			say("pk_crys")
 	for ex in extras:
 		if ex["taken"]:
 			continue
@@ -846,12 +898,14 @@ func _pickup_update() -> void:
 				else:
 					announce("Pack full! Left the heart.")
 					continue
+				say("pk_heart")
 			elif ex["kind"] == "melon":
 				if inv_add("melon"):
 					ex["taken"] = true
 					(ex["node"] as Node3D).visible = false
 					score += 10
 					announce("Sun-melon packed. Tuhkanaama-free calories (press %d to eat)." % _melon_slot())
+					say("pk_melon")
 				else:
 					announce("Pack full! The melon sits there, smelling.")
 					continue
@@ -860,11 +914,13 @@ func _pickup_update() -> void:
 				ex["taken"] = true
 				(ex["node"] as Node3D).visible = false
 				announce("Sharp knife: double damage.")
+				say("pk_sharp")
 			else:
 				speed_bonus += 1.0
 				ex["taken"] = true
 				(ex["node"] as Node3D).visible = false
 				announce("Boots: faster.")
+				say("pk_boots")
 			play_sfx(SFX_COIN)
 
 func _crystals_left() -> int:
@@ -889,12 +945,16 @@ func _exit_update() -> void:
 		if ri < ROOM_DEFS.size() - 1:
 			play_sfx(SFX_DOOR)
 			score += 250
+			if exit_voiced != ri:
+				exit_voiced = ri
+				say("exit_open")
 			_load_room(ri + 1)
 		elif _chained_near(exit_node.position, 8.0):
 			play_sfx(SFX_DOOR)
 			_win()
 		elif open:
 			announce("The final door wants your chained tuhkanaama at heel. Break one: knife it to 1 HP.")
+			say("exit_need")
 
 func hurt(src: String) -> void:
 	if iframes > 0.0 or state != "play":
@@ -905,14 +965,23 @@ func hurt(src: String) -> void:
 	iframes = 1.2
 	combo = 0
 	play_sfx(SFX_HURT)
-	if src == "spike":
-		announce("Spikes! Watch the floor.")
 	if hp <= 0:
+		say("die")
 		state = "dead"
 		play_sfx(SFX_DEATH)
 		_refresh_overlays()
+		return
+	if src == "spike":
+		announce("Spikes! Watch the floor.")
+	if hp == 1:
+		say("lowhp")
+	elif src == "spike":
+		say("spike")
+	else:
+		say("hurt")
 
 func _win() -> void:
+	say("win")
 	state = "win"
 	play_sfx(SFX_WIN)
 	_refresh_overlays()
@@ -1533,6 +1602,14 @@ func _lore_sightings() -> void:
 		if not seen.get(key, false):
 			seen[key] = true
 			announce(String(LORE_ENEMIES[e["type"]]))
+			if e["type"] == "chase":
+				say("foe_chase")
+			elif e["type"] == "dash":
+				say("foe_dash")
+			elif e["type"] == "tuhkanaama":
+				say("foe_tuhk")
+			elif e["type"] == "boss":
+				say("boss_see")
 			return
 	for ex in extras:
 		if ex["taken"] or ex["kind"] != "melon":

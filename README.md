@@ -35,6 +35,9 @@ Unhinged as requested.
 Announcer voice generated locally with Piper en_US-ryan-medium (fight, round_2, round_3, final_round, you_win, game_over, chained, warden_down).
 Regen: `echo "Fight!" | piper --model en_US-ryan-medium.onnx --output_file fight.wav` then `ffmpeg -y -i fight.wav -af loudnorm=I=-16:TP=-1.5:LRA=11,aresample=22050 -ar 22050 -c:a libvorbis -q:a 4 fight.ogg`.
 
+Dialogue barks (`assets/voices/`, 202 lines from `assets/voices/lines.tsv`): Kokoro-82M via kokoro-onnx ONNX runtime (no torch), model `kokoro-v1_0.onnx` + `voices.bin` (thewh1teagle/kokoro-onnx model-files-v1.0). 4 speakers: MOTHER=af_sarah @0.95, HERO=bf_alice @1.05, WARDEN=bm_george @0.85, TUHK=am_adam @1.15.
+Regen: `python gen_voices.py` (venv `/tmp/opencode/koko/venv`, reads `lines.tsv`, Kokoro 24kHz wav then `ffmpeg -y -i wav -af loudnorm=I=-16:TP=-1.5:LRA=11,aresample=22050 -ar 22050 -c:a libvorbis -q:a 4 ogg`). In-game: `VOICE_COUNTS`/`voice_bank`/`say(cat)` with 5s cooldown.
+
 ```
 ████████╗██╗   ██╗ ██████╗ ███╗   ███╗ ██████╗ ███╗   ██╗
 ╚══██╔══╝██║   ██║██╔═══██╗████╗ ████║██╔═══██╗████╗  ██║
