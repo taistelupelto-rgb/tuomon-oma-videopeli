@@ -10,11 +10,12 @@
   #cap { color:#ff0; min-height:2.5em; max-width:640px; margin:8px auto; font-size:13px; }
   #wrap { position:relative; max-width:640px; margin:0 auto; }
   canvas { border:3px solid #c33; background:#000; width:100%; height:auto; display:block; touch-action:none; image-rendering:pixelated; }
-  #joy, #knob, #knifeBtn { display:none; position:absolute; touch-action:none; user-select:none; -webkit-user-select:none; }
+  #joy, #knob, #knifeBtn, #pauseBtn { display:none; position:absolute; touch-action:none; user-select:none; -webkit-user-select:none; }
   #joy { width:110px; height:110px; border:2px solid #0f0; border-radius:50%; opacity:.5; }
   #knob { width:48px; height:48px; background:#0f0; border-radius:50%; opacity:.6; }
   #knifeBtn { width:84px; height:84px; background:#c33; border-radius:50%; opacity:.65; color:#fff; font-family:monospace; font-size:14px; line-height:84px; right:14px; bottom:14px; }
-  @media (pointer:coarse) { #joy, #knob, #knifeBtn { display:block; } }
+  #pauseBtn { width:44px; height:44px; background:#333; border:2px solid #888; border-radius:8px; opacity:.7; color:#fff; font-family:monospace; font-size:18px; line-height:40px; right:10px; top:10px; }
+  @media (pointer:coarse) { #joy, #knob, #knifeBtn, #pauseBtn { display:block; } }
   p.help { color:#888; font-size:12px; max-width:640px; margin:8px auto; }
 </style>
 </head>
@@ -23,10 +24,10 @@
 <div id="cap">loading...</div>
 <div id="wrap">
   <canvas id="g" width="640" height="400"></canvas>
-  <div id="joy"></div><div id="knob"></div><div id="knifeBtn">KNIFE</div>
+  <div id="joy"></div><div id="knob"></div><div id="knifeBtn">KNIFE</div><div id="pauseBtn">II</div>
 </div>
-<p class="help">WASD: move &nbsp;|&nbsp; arrows left/right: turn &nbsp;|&nbsp; hold SPACE: slash &nbsp;|&nbsp; ENTER: new run &nbsp;|&nbsp; R: reroll<br>
-Mobile: left thumb = joystick (forward/strafe), drag right side = look, red button = knife.<br>
+<p class="help">WASD: move &nbsp;|&nbsp; arrows left/right: turn &nbsp;|&nbsp; hold SPACE: slash &nbsp;|&nbsp; ENTER: new run &nbsp;|&nbsp; R: reroll &nbsp;|&nbsp; P: pause<br>
+Mobile: left thumb = joystick (forward/strafe), drag right side = look, red button = knife, II = pause.<br>
 Rooms, not levels. Seeded caves, modifiers, elites, spikes, permadeath. No tears, only knife.</p>
 <script>
 "use strict";
@@ -78,8 +79,8 @@ const ROOM_DEFS = [
     about: "Crystals are context it must READ, the knife is the shell it must RUN. Clear the room to open the exit.",
     pillars: 5, crys: 2, en: 3, spikes: 4, elites: 1, heart: true, sharp: true },
   { name: "ROOM D — DELIVERY",
-    about: "Answer ready. Carry it to the glowing exit and post it back into the Telegram chat. Last daemons.",
-    pillars: 4, crys: 1, en: 2, spikes: 3, elites: 1, heart: false, sharp: false }
+    about: "Answer ready. Something big guards the exit: the CAVE WARDEN charges and calls minions. Kill it, reach the glowing exit, post the answer back.",
+    pillars: 4, crys: 1, en: 2, spikes: 3, elites: 1, boss: true, heart: false, sharp: false }
 ];
 const EXIT_X = TW - 2, EXIT_Y = (TH / 2) | 0;
 
@@ -129,6 +130,10 @@ function genRooms() {
       enemies.push({gx:p.x + 0.5, gy:p.y + 0.5, sp:0.028 + R() * 0.012 + i * 0.004 + fast,
         type:type, elite: k < def.elites});
     }
+    if (def.boss) {
+      const p = freeCell(taken, 4); taken.push(p);
+      enemies.push({gx:p.x + 0.5, gy:p.y + 0.5, sp:0.02, type:"boss", elite:false, boss:true});
+    }
     const extras = [];
     if (def.heart && modifier !== "FAMINE" && R() < 0.5) {
       const p = freeCell(taken, 1.5); taken.push(p);
@@ -173,7 +178,14 @@ function getSeed() {
 addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
   keys[k] = true;
-  if (e.key === "Enter" && state !== "play") newRun();
+  if (e.key === "Enter") {
+    if (state === "pause") state = "play";
+    else if (state !== "play") newRun();
+  }
+  if (k === "p") {
+    if (state === "play") state = "pause";
+    else if (state === "pause") state = "play";
+  }
   if (k === "r" && state === "play") newRun();
   if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)) e.preventDefault();
 });
@@ -219,6 +231,14 @@ try {
   btnEl.addEventListener("touchend", e => { e.preventDefault(); keys[" "] = false; });
   btnEl.addEventListener("mousedown", () => { keys[" "] = true; });
   btnEl.addEventListener("mouseup", () => { keys[" "] = false; });
+  const pauseEl = document.getElementById("pauseBtn");
+  const togglePause = e => {
+    if (e) e.preventDefault();
+    if (state === "play") state = "pause";
+    else if (state === "pause") state = "play";
+  };
+  pauseEl.addEventListener("touchstart", togglePause, {passive:false});
+  pauseEl.addEventListener("mousedown", togglePause);
 } catch (e) { /* no touch DOM in test env */ }
 
 function loadRoom(i) {
@@ -228,9 +248,10 @@ function loadRoom(i) {
     grid: Rm.grid,
     items: Rm.items.map(p => ({x:p.x, y:p.y, taken:false})),
     enemies: Rm.enemies.map(e => {
-      const big = !!e.elite;
-      return {gx:e.gx, gy:e.gy, hp:big ? 4 : 2, maxHp:big ? 4 : 2, sp:e.sp, elite:big,
-        type:e.type, mode:"drift", t:60, vx:0, vy:0, dead:false, cool:0};
+      const boss = !!e.boss, big = !!e.elite;
+      const hp = boss ? 10 : (big ? 4 : 2);
+      return {gx:e.gx, gy:e.gy, hp:hp, maxHp:hp, sp:e.sp, elite:big, boss:boss,
+        type:e.type, mode:"stalk", t:boss ? 160 : 60, st:360, vx:0, vy:0, dead:false, cool:0};
     }),
     extras: Rm.extras.map(e => ({x:e.x, y:e.y, kind:e.kind, taken:false}))
   };
@@ -282,6 +303,35 @@ function turn(a) {
   const dx = dirX * c - dirY * s, dy = dirX * s + dirY * c;
   const px2 = planeX * c - planeY * s, py2 = planeX * s + planeY * c;
   dirX = dx; dirY = dy; planeX = px2; planeY = py2;
+}
+
+// CAVE WARDEN: stalks, telegraphs, charges, calls minions
+function bossMove(e, dx, dy, d) {
+  const dd = d || 1, ox = e.gx, oy = e.gy;
+  if (e.mode === "stalk") {
+    e.gx += dx / dd * e.sp; e.gy += dy / dd * e.sp;
+    e.t--;
+    if (e.t <= 0) { e.mode = "tele"; e.t = 40; }
+  } else if (e.mode === "tele") {
+    e.cool = 2; // flashes white: charge incoming
+    e.t--;
+    if (e.t <= 0) { e.mode = "charge"; e.t = 26; e.vx = dx / dd * 0.11; e.vy = dy / dd * 0.11; }
+  } else if (e.mode === "charge") {
+    e.gx += e.vx; e.gy += e.vy;
+    e.t--;
+    if (e.t <= 0) { e.mode = "stalk"; e.t = 200 + ((R() * 120) | 0); }
+  } else {
+    e.mode = "stalk";
+  }
+  if (solidAt(e.gx, e.gy)) { e.gx = ox; e.gy = oy; if (e.mode === "charge") e.mode = "stalk"; }
+  e.st--;
+  if (e.st <= 0) {
+    e.st = 500;
+    if (cur.enemies.filter(x => !x.dead).length < 6) {
+      cur.enemies.push({gx:e.gx, gy:e.gy, hp:2, maxHp:2, sp:0.03, elite:false, boss:false,
+        type:"chase", mode:"stalk", t:60, st:360, vx:0, vy:0, dead:false, cool:0});
+    }
+  }
 }
 
 // project world tile coords to buffer screen; null if behind
@@ -373,12 +423,14 @@ function update() {
       }
     }
   }
-  // daemons
+  // daemons + the cave warden
   for (const e of cur.enemies) {
     if (e.dead) continue;
     if (e.cool > 0) e.cool--;
     const dx = px - e.gx, dy = py - e.gy, d = Math.hypot(dx, dy) || 1;
-    if (d < 9) {
+    if (e.type === "boss") {
+      bossMove(e, dx, dy, d);
+    } else if (d < 9) {
       if (e.type === "dash") {
         e.t--;
         if (e.mode === "drift") {
@@ -483,7 +535,7 @@ function render() {
     const bob = s.kind === "daemon" ? 0 : Math.sin(tick * 0.1 + gx * 5) * pr.size * 0.03;
     let w, h, yBase = BUF_H / 2 + pr.size * 0.28 + bob;
     if (s.kind === "daemon") {
-      const big = s.o.elite ? 1.35 : 1;
+      const big = s.o.boss ? 1.8 : (s.o.elite ? 1.35 : 1);
       w = pr.size * 0.42 * big; h = pr.size * 0.55 * big;
       drawDaemon(pr.sx, yBase - h, w, h, s.o, pr.ty);
     } else if (s.kind === "crys") {
@@ -527,6 +579,20 @@ function render() {
     b.fillStyle = p.color;
     b.fillRect(p.x, p.y, 2, 2);
   }
+  // exit compass: marker when ahead, warning when behind
+  if (roomClear() && state === "play") {
+    const pr = worldToScreen(EXIT_X + 0.5, EXIT_Y + 0.5);
+    b.fillStyle = "#0f0";
+    b.font = "8px monospace"; b.textAlign = "center";
+    if (pr) {
+      const mx = Math.max(10, Math.min(BUF_W - 10, pr.sx));
+      b.beginPath();
+      b.moveTo(mx, 14); b.lineTo(mx + 5, 21); b.lineTo(mx, 28); b.lineTo(mx - 5, 21);
+      b.closePath(); b.fill();
+    } else {
+      b.fillText("EXIT BEHIND YOU", BUF_W / 2, 22);
+    }
+  }
   // knife overlay (mom's knife, first person)
   const kx = BUF_W - 70, ky = BUF_H - 30;
   if (attackT > 0) {
@@ -563,7 +629,7 @@ function render() {
 function drawDaemon(sx, yTop, w, h, e, dist) {
   if (w < 2 || h < 3) return;
   const f = Math.max(0.15, Math.min(1.2, 1.25 - dist * 0.16));
-  const body = e.cool > 0 ? "#fff" : (e.elite ? "#f80" : (e.type === "dash" ? "#a0f" : "#f00"));
+  const body = e.cool > 0 ? "#fff" : (e.type === "boss" ? "#fc0" : (e.elite ? "#f80" : (e.type === "dash" ? "#a0f" : "#f00")));
   b.fillStyle = shade(body, f);
   const x0 = sx - w / 2;
   for (let x = x0 | 0; x < x0 + w; x += 2) {
@@ -636,6 +702,15 @@ function draw() {
     ["phone -> bridge bot -> agent + tools -> phone.",
      "The caterpillar crawls home.",
      "Press ENTER for a new cave."].forEach((l, i) => ctx.fillText(l, W/2, 200 + i * 28));
+    return;
+  }
+  if (state === "pause") {
+    render();
+    ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 40px monospace"; ctx.textAlign = "center";
+    ctx.fillText("PAUSED", W/2, 180);
+    ctx.font = "14px monospace";
+    ctx.fillText("ENTER or P to resume", W/2, 215);
     return;
   }
   render();
