@@ -136,6 +136,16 @@ var probe_swings := 0
 var probe_hits := 0
 var probe_calls := 0
 var probe_min_arc := 99.0
+var touch_move := Vector2.ZERO
+var touch_slash := false
+var joy_id := -1
+var look_id := -1
+var joy_origin := Vector2.ZERO
+var joy_vec := Vector2.ZERO
+var look_last := Vector2.ZERO
+var joy_base: Panel
+var joy_knob: Panel
+var touch_layer: CanvasLayer
 
 func _ready() -> void:
 	autoplay = false
@@ -163,6 +173,11 @@ func start_run(new_seed: int) -> void:
 	speed_bonus = 0.0
 	seen = {}
 	inventory.clear()
+	touch_move = Vector2.ZERO
+	touch_slash = false
+	joy_id = -1
+	look_id = -1
+	joy_vec = Vector2.ZERO
 	_load_room(0, false) # permadeath: no chains survive a new run
 	state = "play"
 	paused_game = false
@@ -325,6 +340,66 @@ func cell_at_world(pos: Vector3) -> String:
 # ---------------- per-frame ----------------
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		var vp := get_viewport().get_visible_rect().size
+		if event.pressed:
+			var pos0: Vector2 = event.position
+			var on_btn0 := (pos0.x > vp.x * 0.62 and pos0.y > vp.y * 0.62) or (pos0.x > vp.x - 80.0 and pos0.y < 240.0)
+			if state == "title" or state == "dead" or state == "win":
+				start_run(rng.randi() if state != "title" else int(Time.get_unix_time_from_system()) % 100000)
+				return
+			elif state == "play" and paused_game:
+				if on_btn0:
+					return # let the II button handle it
+				paused_game = false
+				_refresh_overlays()
+				return
+			var pos: Vector2 = event.position
+			# Let HUD buttons handle their own touches: bottom-right
+			# KNIFE/EAT cluster + top-right pause must not start a look-drag.
+			var on_buttons := (pos.x > vp.x * 0.62 and pos.y > vp.y * 0.62) or (pos.x > vp.x - 80.0 and pos.y < 240.0)
+			if state == "play" and not paused_game and pos.x < vp.x * 0.45 and pos.y > vp.y * 0.4 and joy_id == -1:
+				joy_id = event.index
+				joy_origin = pos
+				joy_vec = Vector2.ZERO
+				touch_move = Vector2.ZERO
+			elif look_id == -1 and not on_buttons and pos.x > vp.x * 0.45:
+				look_id = event.index
+				look_last = event.position
+		else:
+			if event.index == joy_id:
+				joy_id = -1
+				joy_vec = Vector2.ZERO
+				touch_move = Vector2.ZERO
+			if event.index == look_id:
+				look_id = -1
+		return
+	if event is InputEventScreenDrag:
+		if event.index == joy_id:
+			var d: Vector2 = (event.position - joy_origin) / 60.0
+			if d.length() > 1.0:
+				d = d.normalized()
+			joy_vec = d
+			touch_move = d
+		elif event.index == look_id:
+			yaw -= event.relative.x * 0.006
+			cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, -0.9, 0.9)
+			look_last = event.position
+		return
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if state == "title" or state == "dead" or state == "win":
+			start_run(rng.randi() if state != "title" else int(Time.get_unix_time_from_system()) % 100000)
+			return
+		elif state == "play" and paused_game:
+			paused_game = false
+			_refresh_overlays()
+			return
+	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		var vp2 := get_viewport().get_visible_rect().size
+		if state == "play" and not paused_game and event.position.x > vp2.x * 0.5:
+			yaw -= event.relative.x * 0.006
+			cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, -0.9, 0.9)
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		var k: int = event.physical_keycode
 		if k == KEY_ENTER or k == KEY_KP_ENTER:
@@ -383,8 +458,11 @@ func _physics_process(delta: float) -> void:
 		strafe -= 1.0
 	if Input.is_physical_key_pressed(KEY_D):
 		strafe += 1.0
+	fwd += -touch_move.y
+	strafe += touch_move.x
 	if autoplay:
 		fwd = 1.0
+		strafe = 0.0
 	var mag := Vector2(fwd, strafe).length()
 	if mag > 1.0:
 		fwd /= mag
@@ -426,7 +504,7 @@ func _physics_process(delta: float) -> void:
 	if spike_cd > 0.0:
 		spike_cd -= delta
 	# --- knife ---
-	var slashing := Input.is_physical_key_pressed(KEY_SPACE) or autoplay
+	var slashing := Input.is_physical_key_pressed(KEY_SPACE) or touch_slash or autoplay
 	if slashing and attack_cd <= 0.0:
 		attack_t = 0.28
 		attack_cd = 0.38
@@ -1139,74 +1217,202 @@ func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	hud_top = Label.new()
-	hud_top.position = Vector2(12, 8)
-	hud_top.add_theme_font_size_override("font_size", 18)
+	hud_top.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	hud_top.offset_left = 12
+	hud_top.offset_top = 8
+	hud_top.offset_right = -12
+	hud_top.add_theme_font_size_override("font_size", 20)
 	layer.add_child(hud_top)
 	hud_room = Label.new()
-	hud_room.position = Vector2(12, 32)
+	hud_room.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	hud_room.offset_left = 12
+	hud_room.offset_top = 34
+	hud_room.offset_right = -12
 	hud_room.add_theme_font_size_override("font_size", 14)
 	hud_room.add_theme_color_override("font_color", Color(1, 1, 0))
 	layer.add_child(hud_room)
 	hud_combo = Label.new()
-	hud_combo.position = Vector2(12, 54)
+	hud_combo.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	hud_combo.offset_left = 12
+	hud_combo.offset_top = 58
+	hud_combo.offset_right = -12
 	hud_combo.add_theme_font_size_override("font_size", 14)
 	hud_combo.add_theme_color_override("font_color", Color(1, 0.6, 0.2))
 	layer.add_child(hud_combo)
 	hud_cap = Label.new()
-	hud_cap.position = Vector2(12, 80)
-	hud_cap.size = Vector2(1100, 40)
+	hud_cap.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	hud_cap.offset_left = 12
+	hud_cap.offset_top = 84
+	hud_cap.offset_right = -12
+	hud_cap.offset_bottom = 130
 	hud_cap.add_theme_font_size_override("font_size", 15)
 	hud_cap.add_theme_color_override("font_color", Color(1, 1, 0.4))
 	hud_cap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	layer.add_child(hud_cap)
 	hud_inv = Label.new()
-	hud_inv.position = Vector2(12, 600)
-	hud_inv.size = Vector2(1100, 24)
-	hud_inv.add_theme_font_size_override("font_size", 14)
+	hud_inv.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	hud_inv.offset_left = 12
+	hud_inv.offset_top = -170
+	hud_inv.offset_right = -12
+	hud_inv.offset_bottom = -12
+	hud_inv.add_theme_font_size_override("font_size", 16)
 	hud_inv.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
+	hud_inv.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	layer.add_child(hud_inv)
 	var portrait := TextureRect.new()
 	portrait.texture = load("res://assets/femboy.png") as Texture2D
-	portrait.position = Vector2(12, 560)
-	portrait.custom_minimum_size = Vector2(96, 108)
+	portrait.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	portrait.offset_left = 12
+	portrait.offset_top = -250
+	portrait.offset_right = 76
+	portrait.offset_bottom = -178
+	portrait.custom_minimum_size = Vector2(64, 72)
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	layer.add_child(portrait)
 	minimap = preload("res://minimap.gd").new()
-	minimap.position = Vector2(1152 - 20 * 8 - 24, 44)
+	minimap.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	minimap.offset_left = -196
+	minimap.offset_top = 44
+	minimap.offset_right = -12
+	minimap.offset_bottom = 156
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nWASD move | Arrows turn | SPACE slash | R reroll | P pause | C codex | 1-8 eat from pack\n\nPress ENTER to spawn")
-	dead_panel = _overlay(layer, "YOU DIED", "The cave keeps the knife.\nPress ENTER for a new cave.")
-	win_panel = _overlay(layer, "ENSLAVED AND DELIVERED!", "A chained tuhkanaama kneels at the glowing exit. The cave releases its master.\n\n" + LORE_OUTRO + "\nPress ENTER for a new cave.")
+	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. Left thumb move, right thumb look, KNIFE hold to slash.")
+	dead_panel = _overlay(layer, "YOU DIED", "The cave keeps the knife.\nTap or ENTER for a new cave.")
+	win_panel = _overlay(layer, "ENSLAVED AND DELIVERED!", "A chained tuhkanaama kneels at the glowing exit. The cave releases its master.\n\n" + LORE_OUTRO + "\nTap or ENTER for a new cave.")
 	codex_panel = _overlay(layer, "THE CAVE REMEMBERS", _codex_text())
 	pause_label = Label.new()
-	pause_label.text = "PAUSED — ENTER or P to resume"
-	pause_label.position = Vector2(400, 300)
+	pause_label.text = "PAUSED — TAP, ENTER or P to resume"
+	pause_label.set_anchors_preset(Control.PRESET_CENTER)
+	pause_label.offset_left = -220
+	pause_label.offset_top = -20
+	pause_label.offset_right = 220
+	pause_label.offset_bottom = 20
 	pause_label.add_theme_font_size_override("font_size", 28)
 	pause_label.visible = false
 	layer.add_child(pause_label)
+	_build_touch()
 
 func _overlay(layer: CanvasLayer, title: String, body: String) -> PanelContainer:
 	var pc := PanelContainer.new()
 	pc.set_anchors_preset(Control.PRESET_CENTER)
-	pc.position = Vector2(276, 150)
-	pc.custom_minimum_size = Vector2(600, 300)
+	pc.offset_left = -310
+	pc.offset_top = -230
+	pc.offset_right = 310
+	pc.offset_bottom = 230
+	pc.custom_minimum_size = Vector2(620, 380)
 	var vb := VBoxContainer.new()
 	pc.add_child(vb)
 	var t := Label.new()
 	t.text = title
 	t.add_theme_font_size_override("font_size", 34)
 	t.add_theme_color_override("font_color", Color(0.8, 0.2, 0.2))
+	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vb.add_child(t)
 	var b := Label.new()
 	b.text = body
 	b.add_theme_font_size_override("font_size", 16)
 	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.custom_minimum_size = Vector2(580, 200)
 	vb.add_child(b)
+	var btn := Button.new()
+	btn.text = "TAP TO START / CONTINUE"
+	btn.add_theme_font_size_override("font_size", 22)
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.pressed.connect(_on_overlay_button)
+	vb.add_child(btn)
 	pc.visible = false
 	layer.add_child(pc)
 	return pc
+
+func _on_overlay_button() -> void:
+	if state == "title" or state == "dead" or state == "win":
+		start_run(rng.randi() if state != "title" else int(Time.get_unix_time_from_system()) % 100000)
+	elif state == "play" and paused_game:
+		paused_game = false
+		_refresh_overlays()
+
+func _build_touch() -> void:
+	touch_layer = CanvasLayer.new()
+	touch_layer.layer = 10
+	add_child(touch_layer)
+	var circle := func(c: Color, radius: int, bw: int) -> StyleBoxFlat:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = c
+		sb.border_color = Color(0, 1, 0, 0.8)
+		sb.set_border_width_all(bw)
+		sb.set_corner_radius_all(radius)
+		return sb
+	joy_base = Panel.new()
+	joy_base.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	joy_base.offset_left = 24
+	joy_base.offset_top = -244
+	joy_base.offset_right = 244
+	joy_base.offset_bottom = -24
+	joy_base.add_theme_stylebox_override("panel", circle.call(Color(0, 1, 0, 0.15), 110, 3))
+	joy_base.mouse_filter = Control.MOUSE_FILTER_STOP
+	joy_base.visible = true
+	touch_layer.add_child(joy_base)
+	joy_knob = Panel.new()
+	joy_knob.offset_left = 62
+	joy_knob.offset_top = 62
+	joy_knob.offset_right = 158
+	joy_knob.offset_bottom = 158
+	joy_knob.add_theme_stylebox_override("panel", circle.call(Color(0, 1, 0, 0.35), 48, 2))
+	joy_knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	joy_base.add_child(joy_knob)
+	var knife := Button.new()
+	knife.text = "KNIFE"
+	knife.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	knife.offset_left = -152
+	knife.offset_top = -152
+	knife.offset_right = -24
+	knife.offset_bottom = -24
+	knife.add_theme_font_size_override("font_size", 24)
+	knife.focus_mode = Control.FOCUS_NONE
+	knife.mouse_filter = Control.MOUSE_FILTER_STOP
+	knife.button_down.connect(func() -> void: touch_slash = true)
+	knife.button_up.connect(func() -> void: touch_slash = false)
+	knife.mouse_exited.connect(func() -> void: touch_slash = false)
+	touch_layer.add_child(knife)
+	var eat := Button.new()
+	eat.text = "EAT"
+	eat.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	eat.offset_left = -132
+	eat.offset_top = -252
+	eat.offset_right = -44
+	eat.offset_bottom = -164
+	eat.add_theme_font_size_override("font_size", 20)
+	eat.focus_mode = Control.FOCUS_NONE
+	eat.mouse_filter = Control.MOUSE_FILTER_STOP
+	eat.pressed.connect(_on_eat_button)
+	touch_layer.add_child(eat)
+	var pausb := Button.new()
+	pausb.text = "II"
+	pausb.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	pausb.offset_left = -68
+	pausb.offset_top = 170
+	pausb.offset_right = -12
+	pausb.offset_bottom = 226
+	pausb.add_theme_font_size_override("font_size", 20)
+	pausb.focus_mode = Control.FOCUS_NONE
+	pausb.mouse_filter = Control.MOUSE_FILTER_STOP
+	pausb.pressed.connect(_on_pause_button)
+	touch_layer.add_child(pausb)
+
+func _on_eat_button() -> void:
+	if state != "play" or paused_game:
+		return
+	for i in inventory.size():
+		if inventory[i]["kind"] == "melon" or inventory[i]["kind"] == "heart":
+			inv_use(i)
+			return
+
+func _on_pause_button() -> void:
+	if state == "play":
+		paused_game = not paused_game
+		_refresh_overlays()
 
 func _refresh_hud() -> void:
 	var hearts := ""
@@ -1215,6 +1421,9 @@ func _refresh_hud() -> void:
 	hud_top.text = "LV %02d  HP %s %d/%d  SCORE %06d  CHAIN %d" % [ri + 1, hearts, hp, max_hp, score, _chained_count()]
 	hud_combo.text = ("COMBO x%d" % combo) if combo > 1 else ""
 	hud_inv.text = _inv_text()
+	if is_instance_valid(joy_knob):
+		var off := joy_vec * 62.0
+		joy_knob.position = (joy_base.size - joy_knob.size) * 0.5 + off
 
 func _refresh_overlays() -> void:
 	title_panel.visible = state == "title"
@@ -1223,6 +1432,8 @@ func _refresh_overlays() -> void:
 	if state != "play":
 		codex_panel.visible = false
 	pause_label.visible = state == "play" and paused_game
+	if is_instance_valid(touch_layer):
+		touch_layer.visible = state == "play"
 	_refresh_hud()
 
 func _codex_text() -> String:
