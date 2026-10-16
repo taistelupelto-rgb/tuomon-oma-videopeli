@@ -12,11 +12,12 @@ const EXIT_CELL := Vector2i(18, 6)
 var exit_cell: Vector2i = Vector2i(18, 6)
 const SPAWN_CELL := Vector2i(1, 6)
 const WALK_SPEED := 5.2
-const TURN_SPEED := 2.6
+const TURN_SPEED := 3.4
 const KNIFE_RANGE := 3.0
 const KNIFE_ARC := 1.0 # radians, half-angle
-const CAM_PITCH_MIN := -0.2
-const CAM_PITCH_MAX := 0.45
+const CAM_PITCH_MIN := -0.35
+const CAM_PITCH_MAX := 0.6
+const FOLLOW_CAM := true
 
 const ROOM_DEFS := [
 	{"name": "ROOM A — SPAWN CAVE", "about": "Grab the crystal, find the glowing exit. Every run, a new cave.", "pillars": 2, "crys": 1, "en": 0, "spikes": 0, "elites": 0, "heart": false, "sharp": false},
@@ -121,6 +122,7 @@ var slash_arc_tex: Texture2D
 var shadow_tex: Texture2D
 var shadow_mat: StandardMaterial3D
 var yaw := 0.0
+var cam_yaw := 0.0
 var cam_pitch := -0.2
 var walk_phase := 0.0
 var attack_t := 0.0
@@ -134,6 +136,9 @@ var extras: Array = []  # {cell, pos, kind, taken, node}
 var enemies: Array = [] # {node, mesh, mat, pos(Vector3 x,z in y), hp, maxhp, sp, type, elite, boss, mode, t, st, vx, vz, cool, dead, hit_swing}
 var exit_node: Area3D
 var exit_light: OmniLight3D
+var lantern: OmniLight3D
+var river_mat: StandardMaterial3D
+var river_cells: Array = []
 var rain: GPUParticles3D
 
 var hud_top: Label
@@ -904,7 +909,22 @@ func _gen_grid() -> void:
 			cy = clampi(cy + rng.randi_range(-1, 1), 1, TH - 2)
 	_clear_radius(SPAWN_CELL, 2.5)
 	_clear_radius(exit_cell, 2.5)
-	var taken: Array = []
+	var river_y := TH / 2 + rng.randi_range(-2, 2)
+	for x in range(1, TW - 1):
+		var _rc := Vector2i(x, river_y)
+		if _rc == exit_cell or _rc == SPAWN_CELL:
+			continue
+		if Vector2(x - SPAWN_CELL.x, river_y - SPAWN_CELL.y).length() < 2.5:
+			continue
+		if Vector2(x - exit_cell.x, river_y - exit_cell.y).length() < 2.5:
+			continue
+		if grid[river_y][x] == "E":
+			continue
+		grid[river_y][x] = "w"
+	var bridge_x := 2 + rng.randi() % (TW - 4)
+	grid[river_y][bridge_x] = "."
+	grid[river_y][mini(bridge_x + 1, TW - 2)] = "."
+	var taken: Array = [Vector2i(bridge_x, river_y), Vector2i(mini(bridge_x + 1, TW - 2), river_y)]
 	for k in int(d.get("pillars", 0)):
 		var p := _free_cell(taken, 2.5)
 		taken.append(p)
@@ -1087,15 +1107,15 @@ func _input(event: InputEvent) -> void:
 			var pos: Vector2 = event.position
 			# Let HUD buttons handle their own touches: bottom-right
 			# KNIFE/EAT cluster + top-right pause must not start a look-drag.
-			var on_buttons := (pos.x > vp.x * 0.62 and pos.y > vp.y * 0.62) or (pos.x > vp.x - 80.0 and pos.y < 240.0)
-			if state == "play" and not paused_game and pos.x < vp.x * 0.45 and pos.y > vp.y * 0.4 and joy_id == -1:
+			var on_buttons := (pos.x > vp.x * 0.55 and pos.y > vp.y * 0.55) or (pos.x > vp.x - 100.0 and pos.y < 260.0)
+			if state == "play" and not paused_game and pos.x < vp.x * 0.5 and pos.y > vp.y * 0.3 and joy_id == -1:
 				joy_id = event.index
 				joy_origin = pos
 				if is_instance_valid(joy_base):
 					joy_base.position = joy_origin - joy_base.size * 0.5
 				joy_vec = Vector2.ZERO
 				touch_move = Vector2.ZERO
-			elif look_id == -1 and not on_buttons and pos.x > vp.x * 0.45:
+			elif look_id == -1 and not on_buttons and pos.x > vp.x * 0.5:
 				look_id = event.index
 				look_last = event.position
 		else:
@@ -1106,22 +1126,22 @@ func _input(event: InputEvent) -> void:
 				if is_instance_valid(joy_base):
 					joy_base.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 					joy_base.offset_left = 24
-					joy_base.offset_top = -244
-					joy_base.offset_right = 244
+					joy_base.offset_top = -284
+					joy_base.offset_right = 284
 					joy_base.offset_bottom = -24
 			if event.index == look_id:
 				look_id = -1
 		return
 	if event is InputEventScreenDrag:
 		if event.index == joy_id:
-			var d: Vector2 = (event.position - joy_origin) / 60.0
+			var d: Vector2 = (event.position - joy_origin) / 85.0
 			if d.length() > 1.0:
 				d = d.normalized()
 			joy_vec = d
 			touch_move = d
 		elif event.index == look_id:
-			yaw -= event.relative.x * 0.0025
-			cam_pitch = clampf(cam_pitch + event.relative.y * 0.0018, CAM_PITCH_MIN, CAM_PITCH_MAX)
+			yaw -= event.relative.x * 0.0042
+			cam_pitch = clampf(cam_pitch + event.relative.y * 0.003, CAM_PITCH_MIN, CAM_PITCH_MAX)
 			look_last = event.position
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -1134,7 +1154,7 @@ func _input(event: InputEvent) -> void:
 			return
 	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 		var vp2 := get_viewport().get_visible_rect().size
-		if state == "play" and not paused_game and event.position.x > vp2.x * 0.5:
+		if state == "play" and not paused_game and event.position.x > vp2.x * 0.3:
 			yaw -= event.relative.x * 0.006
 			cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
 		return
@@ -1160,7 +1180,7 @@ func _process(delta: float) -> void:
 	tick += 1
 	if tick % 60 == 0:
 		var s := get_viewport().get_visible_rect().size
-		cam.fov = 82.0 if s.y > s.x else 70.0
+		cam.fov = 88.0 if s.y > s.x else 70.0
 	if cap_t > 0.0:
 		cap_t -= delta
 		if cap_t <= 0.0:
@@ -1230,9 +1250,26 @@ func _physics_process(delta: float) -> void:
 		walk_phase += 9.0 * delta
 	# --- camera rig follows ---
 	cam_rig.position = cam_rig.position.lerp(player_node.position + Vector3(0, 1.7, 0), 0.35)
-	cam_rig.rotation.y = yaw
+	if FOLLOW_CAM:
+		cam_yaw = lerp_angle(cam_yaw, yaw, 1.0 - exp(-3.0 * delta))
+	else:
+		cam_yaw = yaw
+	cam_rig.rotation.y = cam_yaw
 	spring.rotation.x = cam_pitch
 	rain.position = Vector3(player_node.position.x, 6.0, player_node.position.z)
+	if is_instance_valid(lantern):
+		lantern.position = player_node.position + Vector3(0, 2.2, 0)
+		lantern.light_energy = 1.15 + sin(tick * 0.11) * 0.08 + sin(tick * 0.043) * 0.06
+	if is_instance_valid(exit_light):
+		exit_light.light_energy = 1.4 + sin(tick * 0.05) * 0.4
+	if river_mat != null:
+		var _uvo: Vector3 = river_mat.uv1_offset
+		_uvo.x += delta * 0.08
+		river_mat.uv1_offset = _uvo
+	if is_instance_valid(room_node):
+		for c in room_node.get_children():
+			if c is OmniLight3D and c.is_in_group("torch"):
+				c.light_energy = 0.9 + sin(tick * 0.09 + c.position.x * 1.7 + c.position.z) * 0.12
 	# --- timers ---
 	if iframes > 0.0:
 		iframes -= delta
@@ -1765,7 +1802,7 @@ func _build_environment() -> void:
 	sky.sky_material = sm
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.7
+	env.ambient_light_energy = 0.85
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.04, 0.04, 0.08)
 	env.fog_density = 0.03
@@ -1811,6 +1848,13 @@ func _build_environment() -> void:
 	rain.draw_pass_1 = streak
 	rain.visibility_aabb = AABB(Vector3(-16, -8, -16), Vector3(32, 16, 32))
 	add_child(rain)
+	lantern = OmniLight3D.new()
+	lantern.name = "lantern"
+	lantern.light_color = Color(1.0, 0.85, 0.6)
+	lantern.light_energy = 1.2
+	lantern.omni_range = 9.0
+	lantern.shadow_enabled = false
+	add_child(lantern)
 
 func _build_player() -> void:
 	player_node = CharacterBody3D.new()
@@ -1844,8 +1888,8 @@ func _build_player() -> void:
 	cam_rig = Node3D.new()
 	add_child(cam_rig)
 	spring = SpringArm3D.new()
-	spring.position = Vector3(0.9, 0.5, 0)
-	spring.spring_length = 4.6
+	spring.position = Vector3(0.55, 0.5, 0)
+	spring.spring_length = 5.4
 	spring.margin = 0.3
 	spring.collision_mask = 1
 	cam_rig.add_child(spring)
@@ -1854,7 +1898,7 @@ func _build_player() -> void:
 	cam.fov = 70.0
 	var vs := get_viewport().get_visible_rect().size
 	if vs.y > vs.x:
-		cam.fov = 82.0
+		cam.fov = 88.0
 	spring.add_child(cam)
 
 func _build_room_nodes() -> void:
@@ -1873,6 +1917,16 @@ func _build_room_nodes() -> void:
 	var wall_m := _pixel_mat(WALL_TEX, CAVE_PAL)
 	var pillar_m := _pixel_mat(PILLAR_TEX, CAVE_PAL)
 	var spike_m := _tex_mat("spike", SPIKE_TEX, _spike_pal(), 1.6)
+	river_mat = StandardMaterial3D.new()
+	river_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	river_mat.albedo_color = Color(0.15, 0.45, 0.85, 0.65)
+	river_mat.roughness = 0.1
+	river_mat.metallic = 0.3
+	river_mat.emission_enabled = true
+	river_mat.emission = Color(0.1, 0.3, 0.8)
+	river_mat.emission_energy_multiplier = 0.3
+	river_mat.uv1_scale = Vector3(1, 1, 1)
+	river_cells.clear()
 	# one big floor slab for collision
 	var static_body := StaticBody3D.new()
 	static_body.collision_layer = 1
@@ -1921,6 +1975,11 @@ func _build_room_nodes() -> void:
 				var s := _box(Vector3(CELL * 0.9, 0.34, CELL * 0.9), spike_m)
 				s.position = Vector3(wx, 0.17, wz)
 				room_node.add_child(s)
+			elif ch == "w":
+				river_cells.append(Vector2i(mx, my))
+				var wplane := _box(Vector3(CELL * 0.98, 0.06, CELL * 0.98), river_mat)
+				wplane.position = Vector3(wx, 0.03, wz)
+				room_node.add_child(wplane)
 			elif ch == "E":
 				exit_node = Area3D.new()
 				exit_node.position = Vector3(wx, 0.0, wz)
@@ -1933,6 +1992,35 @@ func _build_room_nodes() -> void:
 				exit_light.light_color = Color(0.15, 0.25, 0.4)
 				exit_node.add_child(exit_light)
 				room_node.add_child(exit_node)
+	var torch_spots: Array = []
+	for base in [SPAWN_CELL, exit_cell]:
+		var found := Vector2i(-1, -1)
+		for r in 3:
+			for yy in range(maxi(1, base.y - r), mini(TH - 1, base.y + r + 1)):
+				for xx in range(maxi(1, base.x - r), mini(TW - 1, base.x + r + 1)):
+					if grid[yy][xx] == ".":
+						found = Vector2i(xx, yy)
+						break
+				if found.x >= 0:
+					break
+			if found.x >= 0:
+				break
+		if found.x >= 0:
+			var dup := false
+			for t in torch_spots:
+				if t == found:
+					dup = true
+			if not dup:
+				torch_spots.append(found)
+	for tp in torch_spots.slice(0, 2):
+		var torch := OmniLight3D.new()
+		torch.light_color = Color(1.0, 0.6, 0.25)
+		torch.omni_range = 6.0
+		torch.light_energy = 0.9
+		torch.shadow_enabled = false
+		torch.position = Vector3(tp.x * CELL, 1.6, tp.y * CELL)
+		torch.add_to_group("torch")
+		room_node.add_child(torch)
 	# pickups + enemies
 	for it in items:
 		var p: Vector2i = it["cell"]
@@ -1999,6 +2087,7 @@ func _build_enemy_node(e: Dictionary) -> void:
 func _place_player_spawn() -> void:
 	player_node.position = Vector3(1.5 * CELL, 0.1, TH * CELL / 2.0 - CELL / 2.0)
 	yaw = -PI / 2.0 # face +X down the cave
+	cam_yaw = yaw
 	cam_rig.position = player_node.position + Vector3(0, 1.7, 0)
 	cam_rig.rotation.y = yaw
 
@@ -2156,8 +2245,8 @@ func _build_touch() -> void:
 	joy_base = Panel.new()
 	joy_base.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	joy_base.offset_left = 24
-	joy_base.offset_top = -244
-	joy_base.offset_right = 244
+	joy_base.offset_top = -284
+	joy_base.offset_right = 284
 	joy_base.offset_bottom = -24
 	joy_base.add_theme_stylebox_override("panel", circle.call(Color(0, 1, 0, 0.15), 110, 3))
 	joy_base.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -2174,11 +2263,11 @@ func _build_touch() -> void:
 	var knife := Button.new()
 	knife.text = "KNIFE"
 	knife.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	knife.offset_left = -152
+	knife.offset_left = -176
 	knife.offset_top = -152
 	knife.offset_right = -24
 	knife.offset_bottom = -24
-	knife.add_theme_font_size_override("font_size", 24)
+	knife.add_theme_font_size_override("font_size", 28)
 	knife.focus_mode = Control.FOCUS_NONE
 	knife.mouse_filter = Control.MOUSE_FILTER_STOP
 	knife.button_down.connect(func() -> void: touch_slash = true)
@@ -2188,10 +2277,11 @@ func _build_touch() -> void:
 	var eat := Button.new()
 	eat.text = "EAT"
 	eat.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	eat.offset_left = -132
+	eat.offset_left = -156
 	eat.offset_top = -252
 	eat.offset_right = -44
 	eat.offset_bottom = -164
+	eat.custom_minimum_size = Vector2(128, 88)
 	eat.add_theme_font_size_override("font_size", 20)
 	eat.focus_mode = Control.FOCUS_NONE
 	eat.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -2233,6 +2323,9 @@ func _build_touch() -> void:
 	newb.mouse_filter = Control.MOUSE_FILTER_STOP
 	newb.pressed.connect(_on_new_button)
 	touch_layer.add_child(newb)
+	if DisplayServer.is_touchscreen_available():
+		touch_layer.visible = true
+		has_touch = true
 
 func _on_eat_button() -> void:
 	if state != "play" or paused_game:
