@@ -9,6 +9,8 @@ const TH := 13
 const CELL := 2.0
 const WALL_H := 2.4
 const EXIT_CELL := Vector2i(18, 6)
+var exit_cell: Vector2i = Vector2i(18, 6)
+const SPAWN_CELL := Vector2i(1, 6)
 const WALK_SPEED := 5.2
 const TURN_SPEED := 2.6
 const KNIFE_RANGE := 3.0
@@ -816,6 +818,70 @@ func _load_room(idx: int, keep_chained := true) -> void:
 		announce("FINAL ROUND — " + d["about"])
 	say("room_" + ["a", "b", "c", "d"][idx])
 
+func _pick_exit_cell() -> Vector2i:
+	if rng.randf() < 0.6:
+		return Vector2i(TW - 2, rng.randi_range(1, TH - 2))
+	return Vector2i(rng.randi_range(10, TW - 2), 1)
+
+func _clear_radius(c: Vector2i, r: float) -> void:
+	for y in TH:
+		for x in TW:
+			if x <= 0 or y <= 0 or x >= TW - 1 or y >= TH - 1:
+				continue
+			if Vector2(x - c.x, y - c.y).length() <= r:
+				if grid[y][x] == "#" or grid[y][x] == "P":
+					grid[y][x] = "."
+
+func _bfs_reachable(from: Vector2i) -> Dictionary:
+	var seen := {}
+	if grid[from.y][from.x] == "#" or grid[from.y][from.x] == "P":
+		return seen
+	var q: Array = [from]
+	seen[from] = true
+	var dirs: Array = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	while not q.is_empty():
+		var cur: Vector2i = q.pop_front()
+		for d in dirs:
+			var nx: int = cur.x + d.x
+			var ny: int = cur.y + d.y
+			if nx < 0 or ny < 0 or nx >= TW or ny >= TH:
+				continue
+			var ch: String = grid[ny][nx]
+			if ch == "#" or ch == "P":
+				continue
+			var np := Vector2i(nx, ny)
+			if seen.has(np):
+				continue
+			seen[np] = true
+			q.append(np)
+	return seen
+
+func _carve_line(a: Vector2i, b: Vector2i) -> void:
+	var x := a.x
+	var y := a.y
+	if rng.randf() < 0.5:
+		while x != b.x:
+			x += 1 if b.x > x else -1
+			if x > 0 and y > 0 and x < TW - 1 and y < TH - 1:
+				if grid[y][x] != "E":
+					grid[y][x] = "."
+		while y != b.y:
+			y += 1 if b.y > y else -1
+			if x > 0 and y > 0 and x < TW - 1 and y < TH - 1:
+				if grid[y][x] != "E":
+					grid[y][x] = "."
+	else:
+		while y != b.y:
+			y += 1 if b.y > y else -1
+			if x > 0 and y > 0 and x < TW - 1 and y < TH - 1:
+				if grid[y][x] != "E":
+					grid[y][x] = "."
+		while x != b.x:
+			x += 1 if b.x > x else -1
+			if x > 0 and y > 0 and x < TW - 1 and y < TH - 1:
+				if grid[y][x] != "E":
+					grid[y][x] = "."
+
 func _gen_grid() -> void:
 	var d: Dictionary = ROOM_DEFS[ri]
 	grid.clear()
@@ -824,29 +890,55 @@ func _gen_grid() -> void:
 		for x in TW:
 			row.append("#" if (x == 0 or y == 0 or x == TW - 1 or y == TH - 1) else ".")
 		grid.append(row)
+	exit_cell = _pick_exit_cell()
+	var nblobs := rng.randi_range(2, 4)
+	for b in nblobs:
+		var cx := rng.randi_range(2, TW - 3)
+		var cy := rng.randi_range(2, TH - 3)
+		var blen := rng.randi_range(6, 12)
+		for i in blen:
+			if cx > 0 and cy > 0 and cx < TW - 1 and cy < TH - 1:
+				if Vector2(cx - SPAWN_CELL.x, cy - SPAWN_CELL.y).length() > 2.5 and Vector2(cx - exit_cell.x, cy - exit_cell.y).length() > 2.5:
+					grid[cy][cx] = "P"
+			cx = clampi(cx + rng.randi_range(-1, 1), 1, TW - 2)
+			cy = clampi(cy + rng.randi_range(-1, 1), 1, TH - 2)
+	_clear_radius(SPAWN_CELL, 2.5)
+	_clear_radius(exit_cell, 2.5)
 	var taken: Array = []
 	for k in int(d.get("pillars", 0)):
 		var p := _free_cell(taken, 2.5)
 		taken.append(p)
 		grid[p.y][p.x] = "P"
 	for k in int(d.get("spikes", 0)):
-		var p := _free_cell(taken, 2.5)
-		taken.append(p)
-		grid[p.y][p.x] = "s"
-	grid[EXIT_CELL.y][EXIT_CELL.x] = "E"
-	grid[EXIT_CELL.y][EXIT_CELL.x - 1] = "."
+		var sp := _free_cell(taken, 2.5)
+		taken.append(sp)
+		grid[sp.y][sp.x] = "s"
+	grid[exit_cell.y][exit_cell.x] = "E"
+	if exit_cell.x == TW - 2:
+		grid[exit_cell.y][exit_cell.x - 1] = "."
+	elif exit_cell.y == 1:
+		grid[exit_cell.y + 1][exit_cell.x] = "."
+	else:
+		grid[exit_cell.y][exit_cell.x - 1] = "."
+	if not _bfs_reachable(SPAWN_CELL).has(exit_cell):
+		_carve_line(SPAWN_CELL, exit_cell)
+		grid[exit_cell.y][exit_cell.x] = "E"
 	items.clear()
 	extras.clear()
 	enemies.clear()
 	var ncrys: int = int(d.get("crys", 0)) + (1 if modifier == "RICH" else 0)
 	for k in ncrys:
-		var p := _free_cell(taken, 1.5)
-		taken.append(p)
-		items.append({"cell": p, "taken": false})
+		var cp := _free_cell(taken, 1.5)
+		taken.append(cp)
+		if not _bfs_reachable(SPAWN_CELL).has(cp):
+			_carve_line(SPAWN_CELL, cp)
+		items.append({"cell": cp, "taken": false})
 	var nen: int = int(d.get("en", 0)) + (1 if (modifier == "SWARM" and int(d.get("en", 0)) > 0) else 0)
 	for k in nen:
-		var p := _free_cell(taken, 3.0)
-		taken.append(p)
+		var ep := _free_cell(taken, 3.0)
+		taken.append(ep)
+		if not _bfs_reachable(SPAWN_CELL).has(ep):
+			_carve_line(SPAWN_CELL, ep)
 		var roll := rng.randf()
 		var etype := "chase"
 		if roll < 0.32:
@@ -854,11 +946,13 @@ func _gen_grid() -> void:
 		elif roll < 0.57:
 			etype = "tuhkanaama" # soot-black lurker, fast and tough
 		var fast := (0.8 if modifier == "SWIFT" else 0.0) + (0.5 if modifier == "RICH" else 0.0)
-		enemies.append(_new_enemy(p, etype, k < int(d.get("elites", 0)), false, fast))
+		enemies.append(_new_enemy(ep, etype, k < int(d.get("elites", 0)), false, fast))
 	if bool(d.get("boss", false)):
-		var p := _free_cell(taken, 4.0)
-		taken.append(p)
-		enemies.append(_new_enemy(p, "boss", false, true, 0.0))
+		var bp := _free_cell(taken, 4.0)
+		taken.append(bp)
+		if not _bfs_reachable(SPAWN_CELL).has(bp):
+			_carve_line(SPAWN_CELL, bp)
+		enemies.append(_new_enemy(bp, "boss", false, true, 0.0))
 	# the run always offers a chain: rooms B-D guarantee one tuhkanaama
 	if ri >= 1:
 		var has_t := false
@@ -874,25 +968,33 @@ func _gen_grid() -> void:
 					x["sp"] = float(x["sp"]) + 0.8
 					break
 	if bool(d.get("heart", false)) and modifier != "FAMINE" and rng.randf() < 0.5:
-		var p := _free_cell(taken, 1.5)
-		taken.append(p)
-		extras.append({"cell": p, "kind": "heart", "taken": false})
+		var hp2 := _free_cell(taken, 1.5)
+		taken.append(hp2)
+		if not _bfs_reachable(SPAWN_CELL).has(hp2):
+			_carve_line(SPAWN_CELL, hp2)
+		extras.append({"cell": hp2, "kind": "heart", "taken": false})
 	if bool(d.get("sharp", false)) and rng.randf() < 0.65:
-		var p := _free_cell(taken, 1.5)
-		taken.append(p)
-		extras.append({"cell": p, "kind": "sharp", "taken": false})
+		var shp := _free_cell(taken, 1.5)
+		taken.append(shp)
+		if not _bfs_reachable(SPAWN_CELL).has(shp):
+			_carve_line(SPAWN_CELL, shp)
+		extras.append({"cell": shp, "kind": "sharp", "taken": false})
 	if (ri == 1 or ri == 2) and rng.randf() < 0.5:
-		var p := _free_cell(taken, 1.5)
-		taken.append(p)
-		extras.append({"cell": p, "kind": "boots", "taken": false})
+		var btp := _free_cell(taken, 1.5)
+		taken.append(btp)
+		if not _bfs_reachable(SPAWN_CELL).has(btp):
+			_carve_line(SPAWN_CELL, btp)
+		extras.append({"cell": btp, "kind": "boots", "taken": false})
 	# sun-melons: the tuhkanaama's weakness. Grab them first.
 	var nmelon := 0
 	if ri >= 1 and rng.randf() < 0.7:
 		nmelon = 1 + (1 if modifier == "RICH" else 0)
 	for k in nmelon:
-		var p := _free_cell(taken, 1.5)
-		taken.append(p)
-		extras.append({"cell": p, "kind": "melon", "taken": false})
+		var mp := _free_cell(taken, 1.5)
+		taken.append(mp)
+		if not _bfs_reachable(SPAWN_CELL).has(mp):
+			_carve_line(SPAWN_CELL, mp)
+		extras.append({"cell": mp, "kind": "melon", "taken": false})
 
 func _new_enemy(p: Vector2i, etype: String, elite: bool, boss: bool, fast: float) -> Dictionary:
 	var hpv := 2
@@ -911,9 +1013,11 @@ func _free_cell(taken: Array, min_spawn: float) -> Vector2i:
 	for t in 120:
 		var x := rng.randi_range(1, TW - 2)
 		var y := rng.randi_range(1, TH - 2)
-		if Vector2(x - 1.5, y - TH / 2.0).length() < min_spawn:
+		if grid[y][x] != ".":
 			continue
-		if Vector2(x - EXIT_CELL.x, y - EXIT_CELL.y).length() < 2.2:
+		if Vector2(x - SPAWN_CELL.x, y - SPAWN_CELL.y).length() < min_spawn:
+			continue
+		if Vector2(x - exit_cell.x, y - exit_cell.y).length() < 2.2:
 			continue
 		var ok := true
 		for p in taken:
@@ -922,6 +1026,25 @@ func _free_cell(taken: Array, min_spawn: float) -> Vector2i:
 				break
 		if ok:
 			return Vector2i(x, y)
+	for yy in range(1, TH - 1):
+		for xx in range(1, TW - 1):
+			if grid[yy][xx] != ".":
+				continue
+			if Vector2(xx - SPAWN_CELL.x, yy - SPAWN_CELL.y).length() < min_spawn:
+				continue
+			if Vector2(xx - exit_cell.x, yy - exit_cell.y).length() < 2.2:
+				continue
+			var ok2 := true
+			for p in taken:
+				if Vector2(p - Vector2i(xx, yy)).length() < 1.6:
+					ok2 = false
+					break
+			if ok2:
+				return Vector2i(xx, yy)
+	for yy in range(1, TH - 1):
+		for xx in range(1, TW - 1):
+			if grid[yy][xx] == ".":
+				return Vector2i(xx, yy)
 	return Vector2i(3, 3)
 
 func room_clear() -> bool:
@@ -2259,7 +2382,7 @@ func _autoplay(delta: float) -> void:
 		return
 	# cheat-walk the critical path: fight every 4th cycle, melons even, else crystals, else exit
 	if auto_t % 240 == 0:
-		var target := Vector3(EXIT_CELL.x * CELL, 0, EXIT_CELL.y * CELL)
+		var target := Vector3(exit_cell.x * CELL, 0, exit_cell.y * CELL)
 		var best := 1e9
 		if (auto_t / 240) % 4 == 3:
 			for e in enemies:
@@ -2286,7 +2409,7 @@ func _autoplay(delta: float) -> void:
 					best = d
 					target = it["pos"]
 		if room_clear():
-			target = Vector3(EXIT_CELL.x * CELL, 0, EXIT_CELL.y * CELL)
+			target = Vector3(exit_cell.x * CELL, 0, exit_cell.y * CELL)
 		player_node.position = target + Vector3(0.5, 0.1, 0.0)
 		for e in enemies: # the chained march with the smoke-test too
 			if e.get("enslaved", false) and not e["dead"]:
