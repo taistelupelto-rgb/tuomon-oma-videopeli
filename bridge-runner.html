@@ -795,6 +795,44 @@ function project3(wx, wy, wz) {
 }
 // perspective-correct flat-shaded triangle with per-pixel depth test.
 // v = {sx,sy,depth,wx,wy,wz}, col = base hex, shadeF = brightness fn or const
+// Fast path: writes into world-layer ImageData, composited over sky in one blit.
+// Per-pixel fillRect was the top CPU cost; this keeps one putImageData + drawImage.
+const wbuf = document.createElement("canvas");
+wbuf.width = BUF_W; wbuf.height = BUF_H;
+const wb = wbuf.getContext("2d");
+let wimg = wb.createImageData(BUF_W, BUF_H);
+let wdata = wimg.data;
+const _rgbCache = {};
+function baseRGB(hex) {
+  let hit = _rgbCache[hex];
+  if (hit) return hit;
+  const n = parseInt(hex.slice(1), 16);
+  hit = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  _rgbCache[hex] = hit;
+  return hit;
+}
+const _triCache = {};
+let _triSize = 0;
+function triRGB(col, f) {
+  const q = (f * 8 | 0) / 8;
+  const k = col + q;
+  let hit = _triCache[k];
+  if (hit) return hit;
+  const base = baseRGB(col);
+  hit = [Math.max(0, Math.min(255, base[0] * f)) | 0,
+         Math.max(0, Math.min(255, base[1] * f)) | 0,
+         Math.max(0, Math.min(255, base[2] * f)) | 0];
+  if (_triSize < 1024) { _triCache[k] = hit; _triSize++; }
+  return hit;
+}
+function beginWorld() {
+  wdata.fill(0);
+  zbuf2.fill(999);
+}
+function endWorld() {
+  wb.putImageData(wimg, 0, 0);
+  b.drawImage(wbuf, 0, 0);
+}
 function drawTri(v0, v1, v2, col, f0, f1, f2) {
   let minX = Math.max(0, Math.min(v0.sx, v1.sx, v2.sx) | 0);
   let maxX = Math.min(BUF_W - 1, Math.max(v0.sx, v1.sx, v2.sx) | 0);
@@ -804,6 +842,12 @@ function drawTri(v0, v1, v2, col, f0, f1, f2) {
   const d = (v1.sy - v2.sy) * (v0.sx - v2.sx) + (v2.sx - v1.sx) * (v0.sy - v2.sy);
   if (d === 0) return;
   const i0 = 1 / v0.depth, i1 = 1 / v1.depth, i2 = 1 / v2.depth;
+  const flat = (f0 === f1 && f1 === f2);
+  let fr = 0, fg = 0, fb = 0;
+  if (flat) {
+    const c = triRGB(col, Math.max(0.12, Math.min(1.3, f0)));
+    fr = c[0]; fg = c[1]; fb = c[2];
+  }
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
       const l0 = ((v1.sy - v2.sy) * (x - v2.sx) + (v2.sx - v1.sx) * (y - v2.sy)) / d;
@@ -815,9 +859,14 @@ function drawTri(v0, v1, v2, col, f0, f1, f2) {
       const idx = y * BUF_W + x;
       if (depth >= zbuf2[idx]) continue;
       zbuf2[idx] = depth;
-      const f = (l0 * f0 * i0 + l1 * f1 * i1 + l2 * f2 * i2) / inv;
-      b.fillStyle = shade(col, f);
-      b.fillRect(x, y, 1, 1);
+      const o = idx * 4;
+      if (flat) {
+        wdata[o] = fr; wdata[o + 1] = fg; wdata[o + 2] = fb; wdata[o + 3] = 255;
+      } else {
+        const f = (l0 * f0 * i0 + l1 * f1 * i1 + l2 * f2 * i2) / inv;
+        const c = triRGB(col, Math.max(0.12, Math.min(1.3, f)));
+        wdata[o] = c[0]; wdata[o + 1] = c[1]; wdata[o + 2] = c[2]; wdata[o + 3] = 255;
+      }
     }
   }
 }
@@ -1003,6 +1052,7 @@ function render() {
     b.fillRect(sunSX - 9, 46, 18, 2);
   }
   zbuf2.fill(999);
+  beginWorld();
   const flick = 0.9 + 0.1 * Math.sin(tick * 0.11);
   // ---- REAL 3D: floor + ceiling as textured quads (per-tile, pixelart checker) ----
   for (let my = 0; my < TH; my++) for (let mx = 0; mx < TW; mx++) {
@@ -1055,6 +1105,7 @@ function render() {
     }
     if (c === "s") quad3(mx, my, hTop, mx + 1, my, hTop, mx + 1, my + 1, hTop, mx, my + 1, hTop, base, wallShade(cdist, 1, flick));
   }
+  endWorld();
   // per-column depth for sprites: min over zbuf2 column
   for (let x = 0; x < BUF_W; x++) {
     let m = 999;
