@@ -146,6 +146,7 @@ var look_last := Vector2.ZERO
 var joy_base: Panel
 var joy_knob: Panel
 var touch_layer: CanvasLayer
+var has_touch := false
 
 func _ready() -> void:
 	autoplay = false
@@ -340,6 +341,10 @@ func cell_at_world(pos: Vector3) -> String:
 # ---------------- per-frame ----------------
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.pressed:
+		has_touch = true
+	if event is InputEventScreenDrag:
+		has_touch = true
 	if event is InputEventScreenTouch:
 		var vp := get_viewport().get_visible_rect().size
 		if event.pressed:
@@ -420,6 +425,9 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	tick += 1
+	if tick % 60 == 0:
+		var s := get_viewport().get_visible_rect().size
+		cam.fov = 82.0 if s.y > s.x else 70.0
 	if cap_t > 0.0:
 		cap_t -= delta
 		if cap_t <= 0.0:
@@ -938,11 +946,13 @@ func _build_environment() -> void:
 	sun.light_color = Color(1.0, 0.93, 0.78)
 	sun.light_energy = 1.1
 	sun.shadow_enabled = true
+	if OS.has_feature("web"):
+		sun.shadow_enabled = false
 	sun.rotation_degrees = Vector3(-48, -35, 0)
 	add_child(sun)
 	# rain streaks falling around the player
 	rain = GPUParticles3D.new()
-	rain.amount = 160
+	rain.amount = 80 if OS.has_feature("web") else 160
 	rain.lifetime = 1.1
 	rain.preprocess = 1.1
 	var pm := ParticleProcessMaterial.new()
@@ -1048,6 +1058,9 @@ func _build_player() -> void:
 	spring.add_excluded_object(player_node.get_rid())
 	cam = Camera3D.new()
 	cam.fov = 70.0
+	var vs := get_viewport().get_visible_rect().size
+	if vs.y > vs.x:
+		cam.fov = 82.0
 	spring.add_child(cam)
 
 func _build_room_nodes() -> void:
@@ -1337,6 +1350,7 @@ func _build_touch() -> void:
 	touch_layer = CanvasLayer.new()
 	touch_layer.layer = 10
 	add_child(touch_layer)
+	touch_layer.visible = false
 	var circle := func(c: Color, radius: int, bw: int) -> StyleBoxFlat:
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = c
@@ -1391,11 +1405,11 @@ func _build_touch() -> void:
 	var pausb := Button.new()
 	pausb.text = "II"
 	pausb.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	pausb.offset_left = -68
+	pausb.offset_left = -84
 	pausb.offset_top = 170
 	pausb.offset_right = -12
-	pausb.offset_bottom = 226
-	pausb.add_theme_font_size_override("font_size", 20)
+	pausb.offset_bottom = 242
+	pausb.add_theme_font_size_override("font_size", 22)
 	pausb.focus_mode = Control.FOCUS_NONE
 	pausb.mouse_filter = Control.MOUSE_FILTER_STOP
 	pausb.pressed.connect(_on_pause_button)
@@ -1433,7 +1447,7 @@ func _refresh_overlays() -> void:
 		codex_panel.visible = false
 	pause_label.visible = state == "play" and paused_game
 	if is_instance_valid(touch_layer):
-		touch_layer.visible = state == "play"
+		touch_layer.visible = (state == "play") and (has_touch or DisplayServer.is_touchscreen_available())
 	_refresh_hud()
 
 func _codex_text() -> String:
