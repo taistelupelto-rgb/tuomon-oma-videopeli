@@ -1100,11 +1100,19 @@ func cell_at_world(pos: Vector3) -> String:
 
 # ---------------- per-frame ----------------
 
+func _ball_rect() -> Rect2:
+	var vp := get_viewport().get_visible_rect().size
+	return Rect2(vp.x - 216.0, vp.y - 472.0, 200.0, 200.0)
+
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.pressed:
 		has_touch = true
+		if is_instance_valid(touch_layer) and state == "play":
+			touch_layer.visible = true
 	if event is InputEventScreenDrag:
 		has_touch = true
+		if is_instance_valid(touch_layer) and state == "play":
+			touch_layer.visible = true
 	if event is InputEventScreenTouch:
 		var vp := get_viewport().get_visible_rect().size
 		if event.pressed:
@@ -1120,13 +1128,13 @@ func _input(event: InputEvent) -> void:
 				_refresh_overlays()
 				return
 			var pos: Vector2 = event.position
-			# Let HUD buttons handle their own touches: bottom-right
-			# KNIFE/EAT cluster + top-right pause must not start a look-drag.
-			var on_buttons := (pos.x > vp.x * 0.55 and pos.y > vp.y * 0.55) or (pos.x > vp.x - 100.0 and pos.y < 260.0)
-			if state == "play" and not paused_game and ball_id == -1 and not on_buttons and is_instance_valid(ball_base) and ball_base.get_global_rect().has_point(pos):
+			if state == "play" and not paused_game and ball_id == -1 and _ball_rect().has_point(pos):
 				ball_id = event.index
 				ball_origin = pos
 				return
+			# Let HUD buttons handle their own touches: bottom-right
+			# KNIFE/EAT cluster + top-right pause must not start a look-drag.
+			var on_buttons := (pos.x > vp.x * 0.55 and pos.y > vp.y * 0.55) or (pos.x > vp.x - 100.0 and pos.y < 260.0)
 			if state == "play" and not paused_game and pos.x < vp.x * 0.5 and pos.y > vp.y * 0.3 and joy_id == -1:
 				joy_id = event.index
 				joy_origin = pos
@@ -1134,9 +1142,6 @@ func _input(event: InputEvent) -> void:
 					joy_base.position = joy_origin - joy_base.size * 0.5
 				joy_vec = Vector2.ZERO
 				touch_move = Vector2.ZERO
-			elif look_id == -1 and not on_buttons and pos.x > vp.x * 0.5:
-				look_id = event.index
-				look_last = event.position
 		else:
 			if event.index == ball_id:
 				ball_id = -1
@@ -1173,10 +1178,6 @@ func _input(event: InputEvent) -> void:
 				d = d.normalized()
 			joy_vec = d
 			touch_move = d
-		elif event.index == look_id:
-			yaw -= event.relative.x * 0.0042
-			cam_pitch = clampf(cam_pitch + event.relative.y * 0.003, CAM_PITCH_MIN, CAM_PITCH_MAX)
-			look_last = event.position
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if state == "title" or state == "dead" or state == "win":
@@ -1187,15 +1188,11 @@ func _input(event: InputEvent) -> void:
 			_refresh_overlays()
 			return
 	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
-		if is_instance_valid(ball_base) and is_instance_valid(touch_layer) and touch_layer.visible and ball_base.get_global_rect().has_point(event.position):
+		if _ball_rect().has_point(event.position):
 			if state == "play" and not paused_game:
 				yaw -= event.relative.x * 0.006
 				cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
 			return
-		var vp2 := get_viewport().get_visible_rect().size
-		if state == "play" and not paused_game and event.position.x > vp2.x * 0.3:
-			yaw -= event.relative.x * 0.006
-			cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
 		return
 	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_MIDDLE) != 0:
 		if state == "play" and not paused_game:
