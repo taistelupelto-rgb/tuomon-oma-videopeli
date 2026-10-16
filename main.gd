@@ -573,24 +573,6 @@ const PILLAR_TEX := [
 	"kkdggggmggmggdkk",
 	"kkddddddddddddkk",
 ]
-const CEIL_TEX := [
-	"kkkkkkkkkkkkkkkk",
-	"kdkdkdkdkdkdkdkk",
-	"dddddddddddddddd",
-	"dddsddsddsddsddd",
-	"dsdsdsdsdsdsdsds",
-	"ddwddddwddddwddd",
-	"ddlddddllddddddd",
-	"ddkdddkdddkdddkd",
-	"dkdkdkdkdkdkdkdk",
-	"ddddrdddddrddddd",
-	"dsdsdsdsdsdsdsds",
-	"dddddddddddddddd",
-	"kdkdkdkdkdkdkdkk",
-	"kkkkkkkkkkkkkkkk",
-	"kkkkkkkkkkkkkkkk",
-	"kkkkkkkkkkkkkkkk",
-]
 const SPIKE_TEX := [
 	"DDDDDDDDDDDDDDDD",
 	"DDDDDDDDDDDDDDDD",
@@ -2019,7 +2001,6 @@ func _build_room_nodes() -> void:
 		_pixel_mat(FLOOR_B, CAVE_PAL),
 		_pixel_mat(FLOOR_A, CAVE_PAL),
 	]
-	var ceil_m := _pixel_mat(CEIL_TEX, CAVE_PAL)
 	var wall_m := _pixel_mat(WALL_TEX, CAVE_PAL)
 	var pillar_m := _pixel_mat(PILLAR_TEX, CAVE_PAL)
 	var spike_m := _tex_mat("spike", SPIKE_TEX, _spike_pal(), 1.6)
@@ -2044,7 +2025,7 @@ func _build_room_nodes() -> void:
 	fcol.position = Vector3(TW * CELL / 2.0 - CELL / 2.0, -0.5, TH * CELL / 2.0 - CELL / 2.0)
 	static_body.add_child(fcol)
 	room_node.add_child(static_body)
-	# checker floor tiles (visual) + ceiling
+	# checker floor tiles (visual); no ceiling: open sky keeps the view and rain clear
 	for my in TH:
 		for mx in TW:
 			var wx := mx * CELL
@@ -2053,9 +2034,6 @@ func _build_room_nodes() -> void:
 			var t := _box(Vector3(CELL * 0.98, 0.08, CELL * 0.98), floor_mats[fidx])
 			t.position = Vector3(wx, -0.04, wz)
 			room_node.add_child(t)
-			var c := _box(Vector3(CELL * 0.98, 0.08, CELL * 0.98), ceil_m)
-			c.position = Vector3(wx, WALL_H + 0.6, wz)
-			room_node.add_child(c)
 	# walls / pillars / spikes / exit
 	for my in TH:
 		for mx in TW:
