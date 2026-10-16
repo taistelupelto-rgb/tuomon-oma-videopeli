@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CATERPILLAR: knife of the mother — isaac-like pipeline crawler</title>
+<title>CATERPILLAR: knife of the mother — rooms, not levels</title>
 <style>
   body { background:#0a0a12; color:#e8e8e8; font-family:monospace; text-align:center; margin:16px; }
   h1 { color:#c33; letter-spacing:3px; margin:4px; }
@@ -16,93 +16,144 @@
 <h1>CATERPILLAR: KNIFE OF THE MOTHER</h1>
 <div id="cap">loading...</div>
 <canvas id="g" width="640" height="400"></canvas>
-<p class="help">WASD / arrows: crawl &nbsp;|&nbsp; HOLD SPACE: fling the knife, steer it with movement, release to recall &nbsp;|&nbsp; ENTER: start &nbsp;|&nbsp; R: retry room<br>
-Isaac rules: clear each room (crystals + daemons) to open the doors. Knife kills daemons in 2 hits. 3 hearts. No tears, only knife.</p>
+<p class="help">WASD / arrows: crawl &nbsp;|&nbsp; HOLD SPACE: keep Mom’s knife out and steer it by facing &nbsp;|&nbsp; ENTER: new run &nbsp;|&nbsp; R: reroll cave<br>
+Roguelike rooms, not levels: a new seeded cave every run, permadeath, hearts, whetstones, chasers and dashers. Green Worms-style hero. No tears, only knife.</p>
 <script>
 "use strict";
 const cv = document.getElementById("g"), ctx = cv.getContext("2d");
 const cap = document.getElementById("cap");
 const W = 640, H = 400;
 
-// Binding-of-Isaac-like: rooms, doors, rocks, chaser daemons, Mom's-Knife blade.
-// Lesson unchanged: phone -> bridge bot -> agent + tools -> phone.
-function mkEnemy(x, y, sp) { return {x:x, y:y, w:16, h:16, hp:2, sp:sp, dead:false, cool:0}; }
+// Seeded RNG (mulberry32) — one seed per run, cave differs every run.
+let R = Math.random;
+function srand(s) {
+  let a = s >>> 0;
+  R = function() {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function rint(a, b) { return a + ((R() * (b - a + 1)) | 0); }
 
-const ROOMS = [
-  {
-    name: "ROOM 1/4 — SPAWN CAVE",
-    about: "You spawn in a cave with only a knife. Jaska types '?ask ...' in Telegram. Eat the crystal, walk east through the door.",
-    spawn: [60, 200],
-    rocks: [[300,120,30,30]],
-    items: [[500,200]],
-    enemies: [],
-    goal: null
-  },
-  {
-    name: "ROOM 2/4 — THE BRIDGE",
-    about: "The bridge bot polls Telegram and forwards the message into this machine. Two timeout daemons guard the pipe. Fling the knife (hold SPACE, steer, release). Doors open when the room is clear.",
-    spawn: [60, 200],
-    rocks: [[300,80,30,30],[300,290,30,30]],
-    items: [[320,200],[500,100]],
-    enemies: [mkEnemy(450,150,1.0), mkEnemy(450,260,1.0)],
-    goal: null
-  },
-  {
-    name: "ROOM 3/4 — THE AGENT THINKS",
-    about: "The agent wakes up. It cannot guess: crystals are context it must READ, the knife is the shell it must RUN. Three daemons. Clear them all.",
-    spawn: [60, 200],
-    rocks: [[200,150,30,30],[410,220,30,30],[300,300,30,30]],
-    items: [[320,90],[500,310]],
-    enemies: [mkEnemy(300,200,1.1), mkEnemy(480,120,1.1), mkEnemy(480,300,1.1)],
-    goal: null
-  },
-  {
-    name: "ROOM 4/4 — DELIVERY",
-    about: "Answer ready. Carry it to the PHONE gate and post it back into the Telegram chat. Last two daemons. The knife is hungry.",
-    spawn: [60, 200],
-    rocks: [[300,150,30,100]],
-    items: [[150,100]],
-    enemies: [mkEnemy(420,140,1.2), mkEnemy(420,270,1.2)],
-    goal: [560, 182, 36, 36]
-  }
+const ROOM_DEFS = [
+  { name: "ROOM A — SPAWN CAVE",
+    about: "You spawn in a cave with only a knife. Jaska types '?ask ...' in Telegram. Eat the crystal, walk east. Every run, a new cave.",
+    rocks: 1, crys: 1, en: 0, heart: false, sharp: false },
+  { name: "ROOM B — THE BRIDGE",
+    about: "The bridge bot polls Telegram and forwards the message into this machine. Timeout daemons guard the pipe. Keep the knife out and steer it by facing.",
+    rocks: 2, crys: 2, en: 2, heart: true, sharp: false },
+  { name: "ROOM C — THE AGENT THINKS",
+    about: "The agent wakes up. It cannot guess: crystals are context it must READ, the knife is the shell it must RUN. Clear the room.",
+    rocks: 3, crys: 2, en: 3, heart: true, sharp: true },
+  { name: "ROOM D — DELIVERY",
+    about: "Answer ready. Carry it to the PHONE gate and post it back into the Telegram chat. Last daemons. The knife is hungry.",
+    rocks: 2, crys: 1, en: 2, heart: false, sharp: false }
 ];
-const WIN_TEXT = "DELIVERED! The caterpillar crawls home: phone -> bridge bot -> agent + tools -> phone. Press ENTER to crawl again.";
+const SPAWN = [60, 200];
+const GOAL = [560, 182, 36, 36];
 
-const DOOR = {y:170, h:60}; // door gap in east/west walls
-let state = "title";
-let ri = 0, px = 0, py = 0, hp = 3, iframes = 0;
+function freeSpot(taken, minSpawn) {
+  for (let t = 0; t < 80; t++) {
+    const x = rint(60, 560), y = rint(60, 330);
+    if (Math.hypot(x - SPAWN[0], y - SPAWN[1]) < minSpawn) continue;
+    if (x > 530 && y > 140 && y < 260) continue; // keep door lane walkable
+    if (x > 510 && x < 630 && y > 130 && y < 270) continue; // keep goal clear
+    if (taken.some(p => Math.hypot(p.x - x, p.y - y) < 55)) continue;
+    return {x:x, y:y};
+  }
+  return {x:320, y:200};
+}
+
+let ROOMS = [];
+function genRooms() {
+  ROOMS = ROOM_DEFS.map((def, i) => {
+    const taken = [];
+    const rocks = [];
+    for (let k = 0; k < def.rocks; k++) {
+      const p = freeSpot(taken, 110); taken.push(p);
+      rocks.push([p.x - 15, p.y - 15, 30, 30]);
+    }
+    const items = [];
+    for (let k = 0; k < def.crys; k++) {
+      const p = freeSpot(taken, 60); taken.push(p);
+      items.push([p.x, p.y]);
+    }
+    const enemies = [];
+    for (let k = 0; k < def.en; k++) {
+      const p = freeSpot(taken, 150); taken.push(p);
+      const type = R() < 0.32 ? "dash" : "chase";
+      enemies.push({x:p.x, y:p.y, sp:0.9 + R() * 0.4 + i * 0.12, type:type});
+    }
+    const extras = [];
+    if (def.heart && R() < 0.5) {
+      const p = freeSpot(taken, 60); taken.push(p);
+      extras.push({x:p.x, y:p.y, kind:"heart", taken:false});
+    }
+    if (def.sharp && R() < 0.65) {
+      const p = freeSpot(taken, 60); taken.push(p);
+      extras.push({x:p.x, y:p.y, kind:"sharp", taken:false});
+    }
+    return {name:def.name, about:def.about, spawn:SPAWN.slice(),
+            rocks:rocks, items:items, enemies:enemies, extras:extras,
+            goal: i === 3 ? GOAL.slice() : null};
+  });
+}
+
+const WIN_TEXT = "DELIVERED! The caterpillar crawls home: phone -> bridge bot -> agent + tools -> phone.";
+const DOOR = {y:170, h:60};
+let state = "title"; // title | play | dead | win
+let seed = 1, runStart = 0;
+let ri = 0, px = 0, py = 0, hp = 3, iframes = 0, kills = 0;
 let fx = 1, fy = 0;
-let knife = {mode:"held", x:0, y:0, dx:1, dy:0};
+let knife = {ext:14, x:0, y:0, dx:1, dy:0};
+let knifeBonus = 0, knifeDmg = 1;
 let keys = {};
+let cur = null;
+
+function getSeed() {
+  try {
+    const m = /seed=(\d+)/.exec(location.search);
+    if (m) return (+m[1]) >>> 0;
+  } catch (e) {}
+  return (Math.random() * 1e9) | 0;
+}
 
 addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
   keys[k] = true;
-  if (e.key === "Enter" && (state === "title" || state === "win")) startGame();
-  if (k === "r" && state === "play") loadRoom(ri, true);
+  if (e.key === "Enter" && state !== "play") newRun();
+  if (k === "r" && state === "play") newRun();
   if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)) e.preventDefault();
 });
 addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
 
-function roomState(i) {
-  const R = ROOMS[i];
-  return {
-    items: R.items.map(p => ({x:p[0], y:p[1], taken:false})),
-    enemies: R.enemies.map(e => ({x:e.x, y:e.y, w:16, h:16, hp:2, sp:e.sp, dead:false, cool:0}))
+function loadRoom(i) {
+  ri = i;
+  const Rm = ROOMS[i];
+  cur = {
+    items: Rm.items.map(p => ({x:p[0], y:p[1], taken:false})),
+    enemies: Rm.enemies.map(e => ({x:e.x, y:e.y, w:16, h:16, hp:2, sp:e.sp,
+      type:e.type, mode:"drift", t:60, vx:0, vy:0, dead:false, cool:0})),
+    extras: Rm.extras.map(e => ({x:e.x, y:e.y, kind:e.kind, taken:false}))
   };
-}
-let cur = null;
-function loadRoom(i, hpReset) {
-  const R = ROOMS[i];
-  cur = roomState(i);
-  px = R.spawn[0]; py = R.spawn[1];
+  px = Rm.spawn[0]; py = Rm.spawn[1];
   fx = 1; fy = 0;
-  knife = {mode:"held", x:0, y:0, dx:1, dy:0};
-  if (hpReset) hp = 3;
+  knife = {ext:14, x:px + 21, y:py + 7, dx:1, dy:0};
   iframes = 0;
-  cap.textContent = R.name + " — " + R.about;
+  cap.textContent = Rm.name + " — " + Rm.about + "  [seed " + seed + "]";
 }
-function startGame() { state = "play"; ri = 0; hp = 3; loadRoom(0, false); }
+function newRun() {
+  seed = getSeed();
+  srand(seed);
+  genRooms();
+  state = "play"; ri = 0; hp = 3; kills = 0;
+  knifeBonus = 0; knifeDmg = 1;
+  runStart = Date.now();
+  loadRoom(0);
+}
+function runTime() { return ((Date.now() - runStart) / 1000).toFixed(1) + "s"; }
 
 function hit(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -110,7 +161,6 @@ function hit(a, b) {
 function roomClear() {
   return cur.items.every(i => i.taken) && cur.enemies.every(e => e.dead);
 }
-// solid rock in this room (walls handled by clamping + door gaps)
 function rockAt(x, y, w, h) {
   return ROOMS[ri].rocks.some(r => hit({x:x, y:y, w:w, h:h}, {x:r[0], y:r[1], w:r[2], h:r[3]}));
 }
@@ -118,26 +168,24 @@ function inDoorGap(y) { return y + 14 > DOOR.y && y < DOOR.y + DOOR.h; }
 
 function update() {
   if (state !== "play") return;
-  const R = ROOMS[ri];
+  const Rm = ROOMS[ri];
   const sp = 2.6;
   let vx = 0, vy = 0;
   if (keys["a"] || keys["arrowleft"]) { vx = -sp; fx = -1; fy = 0; }
   if (keys["d"] || keys["arrowright"]) { vx = sp; fx = 1; fy = 0; }
   if (keys["w"] || keys["arrowup"]) { vy = -sp; fx = 0; fy = -1; }
   if (keys["s"] || keys["arrowdown"]) { vy += sp; fx = 0; fy = 1; }
-  // axis-separated move with rock collision
   let nx = px + vx;
   if (!rockAt(nx, py, 14, 14)) px = nx;
   let ny = py + vy;
   if (!rockAt(px, ny, 14, 14)) py = ny;
-  // clamp to room, allow door gaps
   const westOpen = ri > 0, eastOpen = ri < ROOMS.length - 1;
   if (px < 12) {
-    if (westOpen && roomClear() && inDoorGap(py)) { ri--; loadRoom(ri, false); px = W - 30; return; }
+    if (westOpen && roomClear() && inDoorGap(py)) { ri--; loadRoom(ri); px = W - 30; return; }
     px = 12;
   }
   if (px > W - 26) {
-    if (eastOpen && roomClear() && inDoorGap(py)) { ri++; loadRoom(ri, false); px = 20; return; }
+    if (eastOpen && roomClear() && inDoorGap(py)) { ri++; loadRoom(ri); px = 20; return; }
     px = W - 26;
   }
   py = Math.max(12, Math.min(H - 26, py));
@@ -146,50 +194,76 @@ function update() {
   for (const it of cur.items) {
     if (!it.taken && hit(me, {x:it.x - 6, y:it.y - 6, w:12, h:12})) it.taken = true;
   }
+  for (const ex of cur.extras) {
+    if (ex.taken || !hit(me, {x:ex.x - 7, y:ex.y - 7, w:14, h:14})) continue;
+    ex.taken = true;
+    if (ex.kind === "heart") hp = Math.min(3, hp + 1);
+    else { knifeBonus = Math.min(knifeBonus + 10, 30); knifeDmg = 2; }
+  }
 
-  // MOM'S KNIFE: hold space to fling, steer with movement, release to recall
+  // MOM'S KNIFE: melee blade that stays with the hero.
+  // Hold SPACE to keep it extended; steer it by facing. No projectiles.
   const wantKnife = !!keys[" "];
   const cx = px + 7, cy = py + 7;
-  if (knife.mode === "held") {
-    knife.x = cx + fx * 12; knife.y = cy + fy * 12;
-    knife.dx = fx; knife.dy = fy;
-    if (wantKnife) knife.mode = "flying";
-  } else if (knife.mode === "flying") {
-    knife.dx = fx; knife.dy = fy; // steerable, like mom's knife
-    const dist = Math.hypot(knife.x - cx, knife.y - cy);
-    if (dist < 150) { knife.x += knife.dx * 6; knife.y += knife.dy * 6; }
-    else { knife.x = cx + knife.dx * 150; knife.y = cy + knife.dy * 150; }
-    if (!wantKnife) knife.mode = "back";
-  } else { // back
-    const dx = cx - knife.x, dy = cy - knife.y, d = Math.hypot(dx, dy);
-    if (d < 10) knife.mode = "held";
-    else { knife.x += dx / d * 9; knife.y += dy / d * 9; }
-  }
-  // knife damage
+  const targetExt = wantKnife ? 46 + knifeBonus : 16;
+  knife.ext += (targetExt - knife.ext) * 0.45;
+  knife.dx = fx; knife.dy = fy;
+  knife.x = cx + knife.dx * knife.ext;
+  knife.y = cy + knife.dy * knife.ext;
+  const bladeMidX = cx + knife.dx * knife.ext * 0.55;
+  const bladeMidY = cy + knife.dy * knife.ext * 0.55;
   for (const e of cur.enemies) {
     if (e.dead) continue;
     if (e.cool > 0) e.cool--;
-    if (knife.mode !== "held" && e.cool === 0 &&
-        Math.hypot(e.x + 8 - knife.x, e.y + 8 - knife.y) < 18) {
-      e.hp--; e.cool = 25;
-      if (e.hp <= 0) e.dead = true;
+    const ex = e.x + 8, ey = e.y + 8;
+    const tipHit = Math.hypot(ex - knife.x, ey - knife.y) < 20;
+    const edgeHit = Math.hypot(ex - bladeMidX, ey - bladeMidY) < 16;
+    if (e.cool === 0 && (tipHit || edgeHit)) {
+      e.hp -= knifeDmg;
+      e.cool = knifeDmg > 1 ? 30 : 25;
+      if (e.hp <= 0) {
+        e.dead = true;
+        kills++;
+      }
     }
   }
-  // daemons chase (isaac-style chasers)
+  // daemons: chasers + dashers
   for (const e of cur.enemies) {
     if (e.dead) continue;
     const dx = cx - (e.x + 8), dy = cy - (e.y + 8), d = Math.hypot(dx, dy) || 1;
-    e.x += dx / d * e.sp; e.y += dy / d * e.sp;
+    if (e.type === "dash") {
+      e.t--;
+      if (e.mode === "drift") {
+        e.x += dx / d * e.sp * 0.4; e.y += dy / d * e.sp * 0.4;
+        if (e.t <= 0) { e.mode = "dash"; e.t = 22; e.vx = dx / d * 3.4; e.vy = dy / d * 3.4; }
+      } else {
+        e.x += e.vx; e.y += e.vy;
+        if (e.t <= 0) { e.mode = "drift"; e.t = 80 + ((R() * 80) | 0); }
+      }
+    } else {
+      e.x += dx / d * e.sp; e.y += dy / d * e.sp;
+    }
+    e.x = Math.max(12, Math.min(W - 28, e.x));
+    e.y = Math.max(12, Math.min(H - 28, e.y));
     if (iframes === 0 && hit(me, e)) {
       hp--; iframes = 70;
-      if (hp <= 0) { hp = 3; loadRoom(ri, false); return; }
+      if (hp <= 0) {
+        state = "dead";
+        cap.textContent = "YOU DIED in " + Rm.name + " at " + runTime() + ", " + kills +
+          " kills  [seed " + seed + "]. The cave keeps the knife. Press ENTER for a new cave.";
+        return;
+      }
     }
   }
   if (iframes > 0) iframes--;
 
-  if (R.goal && roomClear()) {
-    const g = {x:R.goal[0], y:R.goal[1], w:R.goal[2], h:R.goal[3]};
-    if (hit(me, g)) { state = "win"; cap.textContent = WIN_TEXT; }
+  if (Rm.goal && roomClear()) {
+    const g = {x:Rm.goal[0], y:Rm.goal[1], w:Rm.goal[2], h:Rm.goal[3]};
+    if (hit(me, g)) {
+      state = "win";
+      cap.textContent = WIN_TEXT + " Cleared in " + runTime() + ", " + kills +
+        " kills  [seed " + seed + "]. Press ENTER for a new cave.";
+    }
   }
 }
 
@@ -203,18 +277,15 @@ function drawWalls() {
   ctx.fillStyle = "#3a2f26";
   ctx.fillRect(0, 0, W, 12); ctx.fillRect(0, H - 12, W, 12);
   ctx.fillRect(0, 0, 12, H); ctx.fillRect(W - 12, 0, 12, H);
-  // door gaps
   ctx.fillStyle = "#1a1410";
   if (!first && roomClear()) ctx.fillRect(0, DOOR.y, 12, DOOR.h);
   if (!last && roomClear()) ctx.fillRect(W - 12, DOOR.y, 12, DOOR.h);
-  // locked doors drawn as grates
   ctx.fillStyle = "#661";
-  if ((!first && !roomClear())) ctx.fillRect(0, DOOR.y, 12, DOOR.h);
-  if ((!last && !roomClear())) ctx.fillRect(W - 12, DOOR.y, 12, DOOR.h);
+  if (!first && !roomClear()) ctx.fillRect(0, DOOR.y, 12, DOOR.h);
+  if (!last && !roomClear()) ctx.fillRect(W - 12, DOOR.y, 12, DOOR.h);
 }
 
 function draw() {
-  // isaac-ish floor: checker dirt
   ctx.fillStyle = "#5a4a3a"; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "#544534";
   for (let y = 12; y < H - 12; y += 24)
@@ -222,12 +293,20 @@ function draw() {
       ctx.fillRect(x, y, 12, 12);
   if (state === "title") {
     ctx.fillStyle = "#c33"; ctx.font = "bold 32px monospace"; ctx.textAlign = "center";
-    ctx.fillText("CATERPILLAR", W/2, 120);
-    ctx.fillText("KNIFE OF THE MOTHER", W/2, 160);
+    ctx.fillText("CATERPILLAR", W/2, 110);
+    ctx.fillText("KNIFE OF THE MOTHER", W/2, 150);
     ctx.fillStyle = "#ff0"; ctx.font = "15px monospace";
-    ctx.fillText("No tears. Only knife.", W/2, 200);
+    ctx.fillText("Roguelike: every run a new cave. Permadeath.", W/2, 190);
+    ctx.fillText("No tears. Only knife.", W/2, 212);
     ctx.fillStyle = "#fff";
     ctx.fillText("Press ENTER to spawn", W/2, 260);
+    return;
+  }
+  if (state === "dead") {
+    ctx.fillStyle = "#f00"; ctx.font = "bold 44px monospace"; ctx.textAlign = "center";
+    ctx.fillText("YOU DIED", W/2, 170);
+    ctx.fillStyle = "#fff"; ctx.font = "15px monospace";
+    ctx.fillText("The cave keeps the knife. Press ENTER for a new cave.", W/2, 215);
     return;
   }
   if (state === "win") {
@@ -236,74 +315,110 @@ function draw() {
     ctx.fillStyle = "#fff"; ctx.font = "15px monospace";
     ["phone -> bridge bot -> agent + tools -> phone.",
      "The caterpillar crawls home.",
-     "Press ENTER to crawl again."].forEach((l, i) => ctx.fillText(l, W/2, 200 + i*28));
+     "Press ENTER for a new cave."].forEach((l, i) => ctx.fillText(l, W/2, 200 + i*28));
     return;
   }
-  const R = ROOMS[ri];
+  const Rm = ROOMS[ri];
   drawWalls();
-  // rocks
-  for (const r of R.rocks) {
+  for (const r of Rm.rocks) {
     ctx.fillStyle = "#2b2b2b"; ctx.fillRect(r[0], r[1], r[2], r[3]);
     ctx.fillStyle = "#555"; ctx.fillRect(r[0], r[1], r[2], 5);
   }
-  // crystals
   for (const it of cur.items) {
     if (it.taken) continue;
     circle(it.x, it.y, 7, "#073");
     circle(it.x, it.y, 5, "#0cf");
     circle(it.x - 1, it.y - 1, 2, "#fff");
   }
-  // phone gate
-  if (R.goal) {
+  for (const ex of cur.extras) {
+    if (ex.taken) continue;
+    if (ex.kind === "heart") {
+      ctx.fillStyle = "#400"; ctx.fillRect(ex.x - 8, ex.y - 7, 16, 14);
+      ctx.fillStyle = "#f00"; ctx.fillRect(ex.x - 6, ex.y - 5, 12, 10);
+      ctx.fillStyle = "#fff"; ctx.fillRect(ex.x - 1, ex.y - 3, 3, 6); ctx.fillRect(ex.x - 3, ex.y - 1, 7, 3);
+    } else {
+      ctx.fillStyle = "#ffd700";
+      ctx.beginPath();
+      ctx.moveTo(ex.x, ex.y - 8); ctx.lineTo(ex.x + 6, ex.y);
+      ctx.lineTo(ex.x, ex.y + 8); ctx.lineTo(ex.x - 6, ex.y);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  if (Rm.goal) {
     const open = roomClear();
     ctx.fillStyle = open ? "#0f0" : "#555";
-    ctx.fillRect(R.goal[0], R.goal[1], R.goal[2], R.goal[3]);
+    ctx.fillRect(Rm.goal[0], Rm.goal[1], Rm.goal[2], Rm.goal[3]);
     ctx.fillStyle = "#000"; ctx.font = "bold 9px monospace"; ctx.textAlign = "center";
-    ctx.fillText("PHONE", R.goal[0] + 18, R.goal[1] + 21);
+    ctx.fillText("PHONE", Rm.goal[0] + 18, Rm.goal[1] + 21);
   }
-  // daemons
   for (const e of cur.enemies) {
     if (e.dead) continue;
-    ctx.fillStyle = e.cool > 0 ? "#f88" : "#f00";
+    ctx.fillStyle = e.cool > 0 ? "#fff" : (e.type === "dash" ? "#a0f" : "#f00");
     ctx.fillRect(e.x, e.y, e.w, e.h);
     ctx.fillStyle = "#fff";
     ctx.fillRect(e.x + 3, e.y + 3, 4, 4);
     ctx.fillRect(e.x + 9, e.y + 3, 4, 4);
     if (e.hp === 1) { ctx.fillStyle = "#000"; ctx.fillRect(e.x + 3, e.y + 11, 10, 2); }
   }
-  // caterpillar: head + segments trail behind facing
   const cx = px + 7, cy = py + 7;
   if (!(iframes > 0 && (iframes % 8) < 4)) {
-    for (let s = 3; s >= 1; s--) {
-      circle(cx - fx * s * 11, cy - fy * s * 11, 6, "#1b3a1b");
-      circle(cx - fx * s * 11, cy - fy * s * 11, 5, "#2e7d32");
-    }
-    circle(cx, cy, 8, "#1b3a1b");
-    circle(cx, cy, 7, "#43a047");
-    circle(cx + fx * 3, cy + fy * 3 - 2, 3, "#fff");
-    circle(cx + fx * 4, cy + fy * 4 - 2, 1.5, "#f00");
+    const perpX = -fy, perpY = fx;
+    // shadow and feet: one round Worms-style body, not a snake trail
+    circle(cx, cy + 9, 8, "#000");
+    circle(cx - 4, cy + 8, 3, "#12300f");
+    circle(cx + 4, cy + 8, 3, "#12300f");
+    // body
+    circle(cx, cy, 10, "#123f18");
+    circle(cx, cy, 9, "#3fa34d");
+    circle(cx - 2, cy + 3, 5, "#7bd88a");
+    // rear nubs
+    circle(cx - fx * 9, cy - fy * 9, 2, "#2c7a38");
+    // arm toward the knife
+    circle(cx + fx * 9, cy + fy * 9 + 2, 3, "#2c7a38");
+    // eyes look where the hero faces
+    const eyeBaseX = cx + fx * 2, eyeBaseY = cy + fy * 2 - 3;
+    circle(eyeBaseX + perpX * 4, eyeBaseY + perpY * 4, 3, "#fff");
+    circle(eyeBaseX - perpX * 4, eyeBaseY - perpY * 4, 3, "#fff");
+    circle(eyeBaseX + perpX * 4 + fx, eyeBaseY + perpY * 4 + fy, 1.5, "#111");
+    circle(eyeBaseX - perpX * 4 + fx, eyeBaseY - perpY * 4 + fy, 1.5, "#111");
+    // angry brow and mouth
+    ctx.strokeStyle = "#123f18";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(eyeBaseX + perpX * 5, eyeBaseY + perpY * 5 - 4);
+    ctx.lineTo(eyeBaseX + perpX * 2, eyeBaseY + perpY * 2 - 2);
+    ctx.moveTo(eyeBaseX - perpX * 5, eyeBaseY - perpY * 5 - 4);
+    ctx.lineTo(eyeBaseX - perpX * 2, eyeBaseY - perpY * 2 - 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + fx * 3 - 3, cy + fy * 3 + 4);
+    ctx.lineTo(cx + fx * 3 + 3, cy + fy * 3 + 4);
+    ctx.stroke();
   }
-  // mom's knife
-  if (knife.mode !== "held" || true) {
+  {
     const ang = Math.atan2(knife.dy || fy, knife.dx || fx);
     ctx.save();
     ctx.translate(knife.x, knife.y);
     ctx.rotate(ang);
-    ctx.fillStyle = "#6b4a22"; ctx.fillRect(-12, -2, 8, 4);   // handle
-    ctx.fillStyle = "#c0c5d3"; ctx.fillRect(-4, -3, 22, 6);    // blade
-    ctx.fillStyle = "#fff"; ctx.fillRect(8, -1, 10, 2);        // shine
+    ctx.fillStyle = "#5a3a1c";
+    ctx.fillRect(-34, -2, 9, 4);
+    ctx.fillStyle = "#8a8f9a";
+    ctx.fillRect(-25, -3, 6, 6);
+    ctx.fillStyle = "#d7dbe2";
+    ctx.fillRect(-19, -3, 17, 6);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(-8, -2, 6, 2);
     ctx.restore();
   }
-  // hearts
   for (let h = 0; h < 3; h++) {
     ctx.fillStyle = h < hp ? "#f00" : "#400";
     ctx.fillRect(16 + h * 22, 36, 16, 14);
   }
   ctx.fillStyle = "#fff"; ctx.font = "12px monospace"; ctx.textAlign = "left";
-  ctx.fillText(R.name, 16, 28);
+  ctx.fillText(Rm.name + "  [seed " + seed + "]  kills " + kills, 16, 28);
 }
 
-cap.textContent = "Press ENTER. No tears. Only knife.";
+cap.textContent = "Press ENTER. Every run, a new cave. No tears. Only knife.";
 (function loop() { update(); draw(); requestAnimationFrame(loop); })();
 </script>
 </body>
