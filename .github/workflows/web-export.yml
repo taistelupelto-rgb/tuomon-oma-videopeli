@@ -17,6 +17,12 @@ on:
 permissions:
   contents: write
 
+# Serialize production deploys so concurrent releases land in order,
+# newest last. No polling timer: every release deploys itself.
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
 env:
   GODOT_VERSION: 4.7.2
 
@@ -71,5 +77,33 @@ jobs:
             gh release upload "$TAG" "$ZIP" --clobber
           fi
           gh release view "$TAG"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-prod:
+    needs: export-web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up deploy key
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy release zip to production
+        run: |
+          set -e
+          TAG="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          fi
+          ZIP="caterpillar-godot-web-${TAG}.zip"
+          rm -rf /tmp/proddeploy && mkdir -p /tmp/proddeploy
+          gh release download "$TAG" --pattern "$ZIP" --dir /tmp/proddeploy
+          scp -i ~/.ssh/deploy_key /tmp/proddeploy/"$ZIP" "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/$ZIP"
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "set -e; rm -rf /tmp/proddeploy && mkdir -p /tmp/proddeploy && unzip -q -o /tmp/$ZIP -d /tmp/proddeploy && cp -f /tmp/proddeploy/* /var/www/tuomo.uusbitch.party/ && echo $TAG > /var/www/tuomo.uusbitch.party/.version && rm -rf /tmp/proddeploy /tmp/$ZIP && cat /var/www/tuomo.uusbitch.party/.version"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
