@@ -84,6 +84,8 @@ jobs:
     needs: export-web
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Set up deploy key
         run: |
           set -e
