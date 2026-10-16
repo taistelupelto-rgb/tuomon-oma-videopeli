@@ -139,6 +139,7 @@ var exit_light: OmniLight3D
 var lantern: OmniLight3D
 var river_mat: StandardMaterial3D
 var river_cells: Array = []
+var torches: Array = []
 var rain: GPUParticles3D
 
 var hud_top: Label
@@ -147,6 +148,7 @@ var hud_room: Label
 var hud_combo: Label
 var hud_inv: Label
 var cap_t := 0.0
+var exit_nag_t := 0.0
 var title_panel: PanelContainer
 var dead_panel: PanelContainer
 var win_panel: PanelContainer
@@ -782,6 +784,7 @@ func start_run(new_seed: int) -> void:
 	inventory.clear()
 	voice_cd = 0.0
 	exit_voiced = -1
+	exit_nag_t = 0.0
 	touch_move = Vector2.ZERO
 	touch_slash = false
 	joy_id = -1
@@ -1231,6 +1234,9 @@ func _physics_process(delta: float) -> void:
 		fwd /= mag
 		strafe /= mag
 	var sp := WALK_SPEED * (1.0 + speed_bonus * 0.12)
+	var on_water := cell_at_world(player_node.position) == "w"
+	if on_water:
+		sp *= 0.55
 	var fx := -sin(yaw)
 	var fz := -cos(yaw)
 	var rx := cos(yaw)
@@ -1266,10 +1272,9 @@ func _physics_process(delta: float) -> void:
 		var _uvo: Vector3 = river_mat.uv1_offset
 		_uvo.x += delta * 0.08
 		river_mat.uv1_offset = _uvo
-	if is_instance_valid(room_node):
-		for c in room_node.get_children():
-			if c is OmniLight3D and c.is_in_group("torch"):
-				c.light_energy = 0.9 + sin(tick * 0.09 + c.position.x * 1.7 + c.position.z) * 0.12
+	for t in torches:
+		if is_instance_valid(t):
+			t.light_energy = 0.9 + sin(tick * 0.09 + t.position.x * 1.7 + t.position.z) * 0.12
 	# --- timers ---
 	if iframes > 0.0:
 		iframes -= delta
@@ -1283,6 +1288,8 @@ func _physics_process(delta: float) -> void:
 		spike_cd -= delta
 	if voice_cd > 0.0:
 		voice_cd -= delta
+	if exit_nag_t > 0.0:
+		exit_nag_t -= delta
 	# --- knife ---
 	var slashing := Input.is_physical_key_pressed(KEY_SPACE) or touch_slash or autoplay
 	if slashing and attack_cd <= 0.0:
@@ -1300,6 +1307,7 @@ func _physics_process(delta: float) -> void:
 			hero_sprite.texture = hero_tex1 if int(walk_phase * 2.0) % 2 == 0 else hero_tex2
 		else:
 			hero_sprite.texture = hero_tex1
+		hero_sprite.position.y = 0.75 + (sin(walk_phase * 2.0) * 0.03 if on_water else 0.0)
 	if is_instance_valid(slash_arc):
 		slash_arc.visible = attack_t > 0.0
 		if slash_arc.visible:
@@ -1412,7 +1420,7 @@ func _enemy_update(delta: float) -> void:
 		if float(e.get("flash", 0.0)) > 0.0:
 			e["flash"] = maxf(0.0, float(e.get("flash", 0.0)) - delta)
 		if e.get("enslaved", false):
-			_chain_follow(e, n)
+			_chain_follow(e, n, delta)
 			continue
 		var d := Vector2(pp.x - n.position.x, pp.z - n.position.z)
 		var dist := d.length()
@@ -1534,7 +1542,7 @@ func _tuhkanaama_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: flo
 		n.velocity.x = mdir.x * sp * 1.15
 		n.velocity.z = mdir.y * sp * 1.15
 
-func _chain_follow(e: Dictionary, n: CharacterBody3D) -> void:
+func _chain_follow(e: Dictionary, n: CharacterBody3D, delta: float) -> void:
 	# Broken, collared, loyal. Heels 1.6m behind the hero. Hurts no one.
 	var pp := player_node.position
 	var tx := pp.x + sin(yaw) * 1.6
@@ -1547,8 +1555,13 @@ func _chain_follow(e: Dictionary, n: CharacterBody3D) -> void:
 	else:
 		n.velocity.x = 0.0
 		n.velocity.z = 0.0
+	var npos := n.position + Vector3(n.velocity.x * delta, 0.0, n.velocity.z * delta)
+	var nc := cell_at_world(npos)
+	if nc == "#" or nc == "P":
+		n.velocity.x = 0.0
+		n.velocity.z = 0.0
 	if not n.is_on_floor():
-		n.velocity.y -= 22.0 * 0.016
+		n.velocity.y -= 22.0 * delta
 	else:
 		n.velocity.y = -0.5
 	n.move_and_slide()
@@ -1694,8 +1707,10 @@ func _exit_update() -> void:
 			play_sfx(SFX_DOOR)
 			_win()
 		elif open:
-			announce("The final door wants your chained tuhkanaama at heel. Break one: knife it to 1 HP.")
-			say("exit_need")
+			if exit_nag_t <= 0.0:
+				exit_nag_t = 3.0
+				announce("The final door wants your chained tuhkanaama at heel. Break one: knife it to 1 HP.")
+				say("exit_need")
 
 func hurt(src: String) -> void:
 	if iframes > 0.0 or state != "play":
@@ -1902,6 +1917,7 @@ func _build_player() -> void:
 	spring.add_child(cam)
 
 func _build_room_nodes() -> void:
+	torches.clear()
 	if room_node:
 		room_node.queue_free()
 	room_node = Node3D.new()
@@ -2021,6 +2037,7 @@ func _build_room_nodes() -> void:
 		torch.position = Vector3(tp.x * CELL, 1.6, tp.y * CELL)
 		torch.add_to_group("torch")
 		room_node.add_child(torch)
+		torches.append(torch)
 	# pickups + enemies
 	for it in items:
 		var p: Vector2i = it["cell"]
