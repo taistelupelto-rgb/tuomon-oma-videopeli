@@ -154,6 +154,7 @@ var cap_hist: Array = []
 var r_arm_t := 0.0
 var exit_nag_t := 0.0
 var title_panel: PanelContainer
+var ski_btn: Button
 var dead_panel: PanelContainer
 var win_panel: PanelContainer
 var codex_panel: PanelContainer
@@ -1125,6 +1126,8 @@ func _input(event: InputEvent) -> void:
 			if is_instance_valid(jump_node) and jump_node.visible:
 				return
 			if state == "title" or state == "dead" or state == "win":
+				if state == "title" and is_instance_valid(ski_btn) and ski_btn.is_visible_in_tree() and ski_btn.get_global_rect().has_point(pos0):
+					return
 				start_run(rng.randi() if state != "title" else int(Time.get_unix_time_from_system()) % 100000)
 				return
 			elif state == "play" and paused_game:
@@ -1189,6 +1192,8 @@ func _input(event: InputEvent) -> void:
 		if is_instance_valid(jump_node) and jump_node.visible:
 			return
 		if state == "title" or state == "dead" or state == "win":
+			if state == "title" and is_instance_valid(ski_btn) and ski_btn.is_visible_in_tree() and ski_btn.get_global_rect().has_point(event.position):
+				return
 			start_run(rng.randi() if state != "title" else int(Time.get_unix_time_from_system()) % 100000)
 			return
 		elif state == "play" and paused_game:
@@ -2253,7 +2258,7 @@ func _build_hud() -> void:
 	minimap.offset_bottom = 156
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER cave | J ski jump. Left thumb move, BALL to look, KNIFE hold to slash, M mute.")
+	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, BALL to look, KNIFE hold to slash, M mute.")
 	var title_tex := TextureRect.new()
 	title_tex.texture = load("res://assets/caterpillar.png") as Texture2D
 	title_tex.custom_minimum_size = Vector2(560, 180)
@@ -2263,6 +2268,12 @@ func _build_hud() -> void:
 	var title_vb := title_panel.get_child(0) as VBoxContainer
 	title_vb.add_child(title_tex)
 	title_vb.move_child(title_tex, 0)
+	ski_btn = Button.new()
+	ski_btn.text = "SKI JUMP"
+	ski_btn.add_theme_font_size_override("font_size", 22)
+	ski_btn.focus_mode = Control.FOCUS_NONE
+	ski_btn.pressed.connect(_on_ski_button)
+	title_vb.add_child(ski_btn)
 	dead_panel = _overlay(layer, "YOU DIED", "The cave keeps the knife.\nTap or ENTER for a new cave.")
 	win_panel = _overlay(layer, "ENSLAVED AND DELIVERED!", "A chained tuhkanaama kneels at the glowing exit. The cave releases its master.\n\n" + LORE_OUTRO + "\nTap or ENTER for a new cave.")
 	codex_panel = _overlay(layer, "THE CAVE REMEMBERS", _codex_text(), "CLOSE")
@@ -2321,6 +2332,10 @@ func _overlay(layer: CanvasLayer, title: String, body: String, btn_text: String 
 	pc.visible = false
 	layer.add_child(pc)
 	return pc
+
+func _on_ski_button() -> void:
+	if is_instance_valid(jump_node) and not jump_node.visible:
+		jump_node.visible = true
 
 func _on_overlay_button() -> void:
 	if state == "title" or state == "dead" or state == "win":
