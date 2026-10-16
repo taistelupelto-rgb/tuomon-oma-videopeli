@@ -19,10 +19,14 @@ release instead of cutting their own.
 3. Push the commit to `origin`.
 4. Create a version tag (SemVer: patch for fixes, minor for features,
    e.g. `v0.10.0` -> `v0.11.0`) and push the tag.
-5. Create the GitHub release from that tag:
+5. Create the GitHub release from that tag WITH the playable game file attached
+   (not source-only). The release must contain the game or it does not count:
 
 ```sh
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "What changed"
+cp bridge-runner.html caterpillar-knife-of-the-mother-vX.Y.Z.html
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "What changed" \
+  caterpillar-knife-of-the-mother-vX.Y.Z.html
+rm caterpillar-knife-of-the-mother-vX.Y.Z.html
 ```
 
 6. Verify with:
