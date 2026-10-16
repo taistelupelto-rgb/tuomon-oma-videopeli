@@ -161,6 +161,10 @@ let knifeBonus = 0, knifeDmg = 1, speedBonus = 0, combo = 0, comboT = 0;
 let visited = [false, false, false, false];
 // 2.5D player: position in tiles, direction + camera plane
 let px = 1.5, py = TH / 2, dirX = 1, dirY = 0, planeX = 0, planeY = 0.66;
+// third-person chase camera: trails the hero, over the right shoulder
+const CAM_BACK = 1.9, SHOULDER = 0.45;
+let camPX = 1.5, camPY = TH / 2;
+let walkPhase = 0, walkAmp = 0;
 let attackT = 0, attackCd = 0, flash = 0, shake = 0, tick = 0;
 let lastBonk = -99, lastBoing = -99;
 let keys = {};
@@ -471,6 +475,8 @@ function loadRoom(i) {
     clearAnnounced: false
   };
   px = 1.5; py = TH / 2; dirX = 1; dirY = 0; planeX = 0; planeY = 0.66;
+  camPX = px; camPY = py; walkPhase = 0; walkAmp = 0;
+  updateChaseCam(true);
   attackT = 0; attackCd = 0;
   visited[i] = true;
   iframes = 0;
@@ -552,9 +558,9 @@ function bossMove(e, dx, dy, d) {
   }
 }
 
-// project world tile coords to buffer screen; null if behind
+// project world tile coords to buffer screen; null if behind (from chase cam)
 function worldToScreen(gx, gy) {
-  const relX = gx - px, relY = gy - py;
+  const relX = gx - camPX, relY = gy - camPY;
   const invDet = 1 / (planeX * dirY - dirX * planeY);
   const tx = invDet * (dirY * relX - dirX * relY);
   const ty = invDet * (-planeY * relX + planeX * relY);
@@ -562,9 +568,25 @@ function worldToScreen(gx, gy) {
   return {sx:(BUF_W / 2) * (1 + tx / ty), size:BUF_H / ty, ty:ty};
 }
 
+// third-person chase cam: behind the hero, over the right shoulder, pulled in on walls
+function updateChaseCam(snap) {
+  const rx = -dirY, ry = dirX;
+  const wantX = px - dirX * CAM_BACK + rx * SHOULDER;
+  const wantY = py - dirY * CAM_BACK + ry * SHOULDER;
+  let k = 0;
+  for (const t of [1, 0.7, 0.45, 0.2, 0]) {
+    const cx = px + (wantX - px) * t, cy = py + (wantY - py) * t;
+    if (!solidAt(cx, cy) && !solidAt(cx + 0.15, cy) && !solidAt(cx - 0.15, cy) &&
+        !solidAt(cx, cy + 0.15) && !solidAt(cx, cy - 0.15)) { k = t; break; }
+  }
+  const tx = px + (wantX - px) * k, ty = py + (wantY - py) * k;
+  if (snap) { camPX = tx; camPY = ty; return; }
+  camPX += (tx - camPX) * 0.25;
+  camPY += (ty - camPY) * 0.25;
+}
+
 let particles = [];
-function burst(sx, sy, color, n) {
-  for (let i = 0; i < n; i++) {
+function burst(sx, sy, color, n) {  for (let i = 0; i < n; i++) {
     particles.push({x:sx, y:sy, vx:(R() - 0.5) * 90, vy:-R() * 60, life:22 + R() * 14, color:color});
   }
 }
@@ -573,9 +595,9 @@ function update() {
   if (state !== "play") return;
   tick++;
   const Rm = ROOMS[ri];
-  // look: arrows turn, A/D strafe
-  if (keys["arrowleft"]) turn(0.05);
-  if (keys["arrowright"]) turn(-0.05);
+  // look: arrows turn, A/D strafe (left = left, right = right)
+  if (keys["arrowleft"]) turn(-0.05);
+  if (keys["arrowright"]) turn(0.05);
   // move
   const sp = 0.055 + speedBonus * 0.01;
   let fwd = 0, strafe = 0;
@@ -595,6 +617,11 @@ function update() {
   if (!solidAt(px + r, ny + Math.sign(ny - py) * r) && !solidAt(px - r, ny + Math.sign(ny - py) * r)) py = ny;
   else if (Math.abs(ny - py) > 1e-6) bumped = true;
   if (bumped && tick - lastBonk > 40) { lastBonk = tick; bonk(); }
+  // walk cycle drives the visible legs; chase cam follows every frame
+  const moving = mag > 0.1;
+  if (moving) walkPhase += 0.28 * Math.min(1.2, mag);
+  walkAmp += ((moving ? 1 : 0) - walkAmp) * 0.15;
+  updateChaseCam(false);
   // spike tile
   if (cellAt(px, py) === "s") hurt("spike");
   if (state !== "play") return;
@@ -714,11 +741,11 @@ function shade(hex, f) {
 function castColumn(x) {
   const camX = 2 * x / BUF_W - 1;
   const rayX = dirX + planeX * camX, rayY = dirY + planeY * camX;
-  let mapX = px | 0, mapY = py | 0;
+  let mapX = camPX | 0, mapY = camPY | 0;
   const dDX = Math.abs(1 / (rayX || 1e-9)), dDY = Math.abs(1 / (rayY || 1e-9));
   let stepX, stepY, sideX, sideY;
-  if (rayX < 0) { stepX = -1; sideX = (px - mapX) * dDX; } else { stepX = 1; sideX = (mapX + 1 - px) * dDX; }
-  if (rayY < 0) { stepY = -1; sideY = (py - mapY) * dDY; } else { stepY = 1; sideY = (mapY + 1 - py) * dDY; }
+  if (rayX < 0) { stepX = -1; sideX = (camPX - mapX) * dDX; } else { stepX = 1; sideX = (mapX + 1 - camPX) * dDX; }
+  if (rayY < 0) { stepY = -1; sideY = (camPY - mapY) * dDY; } else { stepY = 1; sideY = (mapY + 1 - camPY) * dDY; }
   let side = 0, cell = "#", guard = 0;
   while (guard++ < 64) {
     if (sideX < sideY) { sideX += dDX; mapX += stepX; side = 0; }
@@ -730,6 +757,91 @@ function castColumn(x) {
   let dist = side === 0 ? sideX - dDX : sideY - dDY;
   if (dist < 0.05) dist = 0.05;
   return {dist:dist, side:side, cell:cell};
+}
+
+// third-person hero: back view with animated legs + knife, drawn over the world
+function drawHero() {
+  const pr = worldToScreen(px, py);
+  const sx = pr ? Math.max(20, Math.min(BUF_W - 20, pr.sx)) : BUF_W * 0.38;
+  const size = pr ? pr.ty : 1.9;
+  const hgt = Math.max(46, Math.min(132, (BUF_H / size) * 0.9));
+  const u = hgt / 95;
+  const feetY = BUF_H / 2 + (BUF_H / size) * 0.28;
+  const bobY = -Math.abs(Math.sin(walkPhase)) * 3 * u * walkAmp;
+  const y0 = feetY - hgt + bobY; // top of head
+  const hurtBlink = (iframes > 40 && (tick % 8) < 4) || flash > 0;
+  const skin = hurtBlink ? "#ffffff" : "#ffe3c8";
+  const hair = hurtBlink ? "#ffffff" : "#ffb3c8";
+  const hairD = hurtBlink ? "#ffffff" : "#e07fa2";
+  const top = hurtBlink ? "#ffffff" : "#2a9d8f";
+  const shoe = "#3a2a3a";
+  const cx = sx;
+  // shadow
+  b.fillStyle = "rgba(0,0,0,0.4)";
+  b.fillRect(cx - 12 * u, feetY - 2 * u, 24 * u, 4 * u);
+  // legs: bare, stride lifts alternate feet ("stinking legs" as requested)
+  const liftL = Math.max(0, Math.sin(walkPhase)) * 8 * u * walkAmp;
+  const liftR = Math.max(0, -Math.sin(walkPhase)) * 8 * u * walkAmp;
+  const hipY = feetY - 34 * u + bobY;
+  const legW = 6 * u, legH = 30 * u;
+  b.fillStyle = skin;
+  b.fillRect(cx - 8 * u, hipY, legW, legH - liftL);
+  b.fillRect(cx + 2 * u, hipY, legW, legH - liftR);
+  // shoes
+  b.fillStyle = shoe;
+  b.fillRect(cx - 9 * u, hipY + legH - liftL - 4 * u, legW + 2 * u, 4 * u);
+  b.fillRect(cx + 1 * u, hipY + legH - liftR - 4 * u, legW + 2 * u, 4 * u);
+  // torso (hoodie, back view)
+  const shY = hipY - 30 * u;
+  b.fillStyle = top;
+  b.fillRect(cx - 11 * u, shY, 22 * u, 30 * u);
+  b.fillStyle = "rgba(0,0,0,0.25)";
+  b.fillRect(cx - 11 * u, shY + 24 * u, 22 * u, 6 * u);
+  // arms swing against the legs
+  const swA = -Math.sin(walkPhase) * 6 * u * walkAmp;
+  b.fillStyle = top;
+  b.fillRect(cx - 15 * u, shY + 2 * u + swA * 0.4, 4 * u, 22 * u - swA * 0.4);
+  b.fillRect(cx + 11 * u, shY + 2 * u - swA * 0.4, 4 * u, 22 * u + swA * 0.4);
+  b.fillStyle = skin;
+  b.fillRect(cx - 15 * u, shY + 24 * u + swA * 0.4, 4 * u, 5 * u);
+  // head: back of head = hair, ears up
+  const hdY = shY - 22 * u, hdW = 18 * u, hdH = 20 * u;
+  b.fillStyle = hairD;
+  b.fillRect(cx - hdW / 2 - 1, hdY - 1, hdW + 2, hdH + 2);
+  b.fillStyle = hair;
+  b.fillRect(cx - hdW / 2, hdY, hdW, hdH);
+  // hair falls down the back over the hoodie
+  b.fillRect(cx - hdW / 2, hdY + hdH - 2, hdW, 8 * u);
+  // nekomimi ears from behind
+  b.fillStyle = hair;
+  const earW = 6 * u, earH = 8 * u;
+  b.fillRect(cx - hdW / 2 - 1, hdY - earH + 2, earW, earH);
+  b.fillRect(cx + hdW / 2 - earW + 1, hdY - earH + 2, earW, earH);
+  b.fillStyle = "#c9576b";
+  b.fillRect(cx - hdW / 2, hdY - earH + 4, earW - 2, earH - 4);
+  b.fillRect(cx + hdW / 2 - earW + 2, hdY - earH + 4, earW - 2, earH - 4);
+  // knife in right hand: idle points down, swing sweeps on attack
+  const handX = cx + 13 * u, handY = shY + 26 * u - swA * 0.4;
+  b.fillStyle = "#5a3a1c";
+  b.fillRect(handX - 2 * u, handY - 2 * u, 4 * u, 8 * u);
+  if (attackT > 0) {
+    const sw = (10 - attackT) / 10;
+    const len = (30 + sw * 26) * u;
+    b.save();
+    b.translate(handX, handY + 4 * u);
+    b.rotate(-0.5 - sw * 1.6);
+    b.fillStyle = "#d7dbe2";
+    b.fillRect(0, -3 * u, len, 6 * u);
+    b.fillStyle = "#fff";
+    b.fillRect(len * 0.55, -1.5 * u, len * 0.4, 3 * u);
+    b.restore();
+    // slash arc
+    b.fillStyle = "rgba(255,255,255," + (0.5 * (1 - sw)).toFixed(2) + ")";
+    b.fillRect(handX - 6 * u, handY - 26 * u + sw * 22 * u, 44 * u, 3 * u);
+  } else {
+    b.fillStyle = "#c0c5d3";
+    b.fillRect(handX - 2 * u, handY + 4 * u, 4 * u, 18 * u);
+  }
 }
 
 function render() {
@@ -767,8 +879,8 @@ function render() {
   for (const ex of cur.extras) if (!ex.taken) sps.push({o:ex, kind:ex.kind});
   for (const e of cur.enemies) if (!e.dead) sps.push({o:e, kind:"daemon"});
   sps.sort((a, c) => {
-    const ax = (a.o.gx !== undefined ? a.o.gx : a.o.x) - px, ay = (a.o.gy !== undefined ? a.o.gy : a.o.y) - py;
-    const cx = (c.o.gx !== undefined ? c.o.gx : c.o.x) - px, cy = (c.o.gy !== undefined ? c.o.gy : c.o.y) - py;
+    const ax = (a.o.gx !== undefined ? a.o.gx : a.o.x) - camPX, ay = (a.o.gy !== undefined ? a.o.gy : a.o.y) - camPY;
+    const cx = (c.o.gx !== undefined ? c.o.gx : c.o.x) - camPX, cy = (c.o.gy !== undefined ? c.o.gy : c.o.y) - camPY;
     return (cx * cx + cy * cy) - (ax * ax + ay * ay);
   });
   for (const s of sps) {
@@ -837,28 +949,8 @@ function render() {
       b.fillText("EXIT BEHIND YOU", BUF_W / 2, 22);
     }
   }
-  // knife overlay (mom's knife, first person)
-  const kx = BUF_W - 70, ky = BUF_H - 30;
-  if (attackT > 0) {
-    const sw = (10 - attackT) / 10; // 0..1 across the swing
-    const len = 120, a0 = -0.9 + sw * 1.1;
-    const ex = kx + Math.cos(a0 - 1.2) * len * 0.4 - 60 + sw * 120;
-    const ey = ky - 40 - Math.sin(sw * 3.14) * 50;
-    b.save();
-    b.translate(ex, ey);
-    b.rotate(a0);
-    b.fillStyle = "#5a3a1c"; b.fillRect(-26, -5, 18, 10);
-    b.fillStyle = "#d7dbe2"; b.fillRect(-8, -7, 66, 14);
-    b.fillStyle = "#fff"; b.fillRect(30, -3, 24, 5);
-    b.restore();
-  } else {
-    b.save();
-    b.translate(kx, ky);
-    b.rotate(-0.7);
-    b.fillStyle = "#5a3a1c"; b.fillRect(-18, -4, 12, 8);
-    b.fillStyle = "#c0c5d3"; b.fillRect(-6, -5, 44, 10);
-    b.restore();
-  }
+  // third-person hero with the stinking legs, knife in hand
+  drawHero();
   // damage flash
   if (flash > 0) {
     b.fillStyle = "rgba(255,0,0,0.35)";
