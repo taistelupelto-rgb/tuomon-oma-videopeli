@@ -1276,9 +1276,9 @@ func _build_hud() -> void:
 	portrait.texture = load("res://assets/femboy.png") as Texture2D
 	portrait.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	portrait.offset_left = 12
-	portrait.offset_top = -250
+	portrait.offset_top = -330
 	portrait.offset_right = 76
-	portrait.offset_bottom = -178
+	portrait.offset_bottom = -258
 	portrait.custom_minimum_size = Vector2(64, 72)
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -1419,6 +1419,30 @@ func _build_touch() -> void:
 	pausb.mouse_filter = Control.MOUSE_FILTER_STOP
 	pausb.pressed.connect(_on_pause_button)
 	touch_layer.add_child(pausb)
+	var codex := Button.new()
+	codex.text = "?"
+	codex.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	codex.offset_left = 12
+	codex.offset_top = 170
+	codex.offset_right = 76
+	codex.offset_bottom = 234
+	codex.add_theme_font_size_override("font_size", 22)
+	codex.focus_mode = Control.FOCUS_NONE
+	codex.mouse_filter = Control.MOUSE_FILTER_STOP
+	codex.pressed.connect(_on_codex_button)
+	touch_layer.add_child(codex)
+	var newb := Button.new()
+	newb.text = "NEW"
+	newb.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	newb.offset_left = 12
+	newb.offset_top = 242
+	newb.offset_right = 76
+	newb.offset_bottom = 282
+	newb.add_theme_font_size_override("font_size", 16)
+	newb.focus_mode = Control.FOCUS_NONE
+	newb.mouse_filter = Control.MOUSE_FILTER_STOP
+	newb.pressed.connect(_on_new_button)
+	touch_layer.add_child(newb)
 
 func _on_eat_button() -> void:
 	if state != "play" or paused_game:
@@ -1432,6 +1456,18 @@ func _on_pause_button() -> void:
 	if state == "play":
 		paused_game = not paused_game
 		_refresh_overlays()
+
+func _on_codex_button() -> void:
+	if state == "play":
+		codex_panel.visible = not codex_panel.visible
+
+func _on_new_button() -> void:
+	if state != "play":
+		return
+	if paused_game:
+		start_run(int(Time.get_unix_time_from_system()) % 100000)
+	else:
+		announce("Pause first: II, then NEW.")
 
 func _refresh_hud() -> void:
 	var hearts := ""
