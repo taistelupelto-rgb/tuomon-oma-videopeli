@@ -23,6 +23,38 @@ const ROOM_DEFS := [
 
 const MODIFIERS := ["NONE", "NONE", "SWARM", "SWIFT", "FAMINE", "RICH"]
 
+# ---------------- lore ----------------
+# The cave remembers. The codex (key C) holds it all.
+const LORE_INTRO := "Before the cave, there was the Mother: a caterpillar the size of a harvest moon, who ate the sky green and slept under the world. From her last egg hatched you — small, soft, and furious. The cave took your siblings. It left you one knife. No tears. Only knife."
+const LORE_OUTRO := "DELIVERED. The knife returns to the Mother's egg-shell altar, and the cave, for one night, stops hungering. Somewhere below, a new egg cracks. The Mother provides."
+const LORE_ROOMS := [
+	"ROOM A — the Mother's throat. The walls here are warm. She swallowed this cave whole to hide it from the sky-eaters. The crystal is her milk-tooth. Take it.",
+	"ROOM B — the Bridge. Long ago the caterpillar-folk strung a rope of spit and song across the dark so messages could travel: phone, bot, agent, phone. Daemons nest in the ropes now. They eat messengers.",
+	"ROOM C — the Thinking Dark. The agent dreams here. Every crystal is a thought it almost finished. The knife is the only argument the dark respects. Elites are thoughts that learned to bite back.",
+	"ROOM D — the Warden's gullet. The CAVE WARDEN was the Mother's guard-dog, fed on exit-doors until it forgot every door but hunger. Kill it kindly. It remembers being good.",
+]
+const LORE_ENEMIES := {
+	"chase": "HOLLOW CHASER — a daemon that forgot its own name and chases yours instead. It runs at what it fears. It fears you rightly.",
+	"dash": "LUNGE-MAW — it shows its white eyes before it strikes. Old miners say the flash is the last light its victims ever see. Sidestep the telegraph.",
+	"tuhkanaama": "TUHKANAAMA — the Soot-Face. Once the Mother's chimney-sweep, black with honest ash. It fell into the Thinking Dark and now it hungers. It loves watermelons more than anything: each melon recalls the summer fields above. It eats to remember. Its teeth glow white with the memory of every seed it ever spat at the sun.",
+	"boss": "THE CAVE WARDEN — heap-big hunger, the Mother's firstborn guard. It charges what it cannot understand and summons the small hungers to its side. Under the gold hide, it still wears its puppy collar. You will not see it. It is there.",
+}
+const LORE_ITEMS := {
+	"crys": "MILK-TOOTH CRYSTAL — a tooth the Mother shed while dreaming of you. The agent drinks these like context. Carry them out.",
+	"heart": "BLOOD-APPLE HEART — not an apple, not a heart. It beats anyway. +1 HP. The cave grew it around a miner's lost wedding ring.",
+	"sharp": "GRANDMOTHER'S EDGE — a whetstone that remembers every blade. Permanent double knife damage. It hums lullabies when swung.",
+	"boots": "DANCER'S BOOTS — seven-league slippers, slightly used. The previous owner danced out of the cave and never stopped. Faster feet.",
+	"melon": "SUN-MELON — a watermelon smuggled down from the summer fields. Sweet, heavy, green as envy. Heals. But beware: the Tuhkanaama smells it from three caves away, and it will cross the dark for a taste.",
+}
+const LORE_EXIT := "THE GLOWING EXIT — a door the Warden swallowed and could not digest. It opens only for the worthy: every crystal carried, every daemon answered. Green means go."
+const LORE_MODS := {
+	"SWARM": "Omen SWARM — the dark is extra hungry tonight. More daemons.",
+	"SWIFT": "Omen SWIFT — the daemons drank the underground river. They run fast.",
+	"FAMINE": "Omen FAMINE — no hearts grow this run. The cave keeps them.",
+	"RICH": "Omen RICH — the Mother's pockets are full. Extra crystals, quicker feet.",
+	"NONE": "Omen NONE — a quiet night in the cave. Relatively.",
+}
+
 const SFX_SLASH := preload("res://assets/sfx/knifeSlice.ogg")
 const SFX_SLASH2 := preload("res://assets/sfx/knifeSlice2.ogg")
 const SFX_HIT := preload("res://assets/sfx/impactPunch_medium_000.ogg")
@@ -88,6 +120,8 @@ var cap_t := 0.0
 var title_panel: PanelContainer
 var dead_panel: PanelContainer
 var win_panel: PanelContainer
+var codex_panel: PanelContainer
+var seen := {}
 var pause_label: Label
 var minimap: Control
 var sfx_players: Array = []
@@ -116,12 +150,13 @@ func start_run(new_seed: int) -> void:
 	combo = 0
 	knife_dmg = 1
 	speed_bonus = 0.0
+	seen = {}
 	_load_room(0)
 	state = "play"
 	paused_game = false
 	_refresh_overlays()
 	play_sfx(SFX_FIGHT)
-	announce("FIGHT! Modifier: " + modifier)
+	announce("FIGHT! " + String(LORE_MODS.get(modifier, "")))
 
 func _load_room(idx: int) -> void:
 	ri = idx
@@ -195,6 +230,14 @@ func _gen_grid() -> void:
 		var p := _free_cell(taken, 1.5)
 		taken.append(p)
 		extras.append({"cell": p, "kind": "boots", "taken": false})
+	# sun-melons: the tuhkanaama's weakness. Grab them first.
+	var nmelon := 0
+	if ri >= 1 and rng.randf() < 0.7:
+		nmelon = 1 + (1 if modifier == "RICH" else 0)
+	for k in nmelon:
+		var p := _free_cell(taken, 1.5)
+		taken.append(p)
+		extras.append({"cell": p, "kind": "melon", "taken": false})
 
 func _new_enemy(p: Vector2i, etype: String, elite: bool, boss: bool, fast: float) -> Dictionary:
 	var hpv := 2
@@ -258,6 +301,8 @@ func _input(event: InputEvent) -> void:
 		elif k == KEY_P and state == "play":
 			paused_game = not paused_game
 			_refresh_overlays()
+		elif k == KEY_C and state == "play":
+			codex_panel.visible = not codex_panel.visible
 
 func _process(delta: float) -> void:
 	tick += 1
@@ -355,6 +400,7 @@ func _physics_process(delta: float) -> void:
 	_pickup_update()
 	_spike_update()
 	_exit_update()
+	_lore_sightings()
 	_refresh_hud()
 
 func _knife_hits() -> void:
@@ -408,6 +454,8 @@ func _enemy_update(delta: float) -> void:
 			e["cool"] = float(e["cool"]) - delta
 		if e["type"] == "boss":
 			_boss_move(e, n, dir, dist, delta)
+		elif e["type"] == "tuhkanaama":
+			_tuhkanaama_move(e, n, dir, dist, sp)
 		elif e["type"] == "dash":
 			e["t"] = float(e["t"]) - delta
 			if e["mode"] == "stalk":
@@ -477,6 +525,42 @@ func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, de
 		if alive < 6:
 			_spawn_minion(n.position)
 
+func _nearest_melon(from: Vector3) -> Dictionary:
+	var best := {}
+	var bd := 10.0
+	for ex in extras:
+		if ex["taken"] or ex["kind"] != "melon":
+			continue
+		var d: float = from.distance_to(ex["pos"])
+		if d < bd:
+			bd = d
+			best = ex
+	return best
+
+func _tuhkanaama_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, sp: float) -> void:
+	# The soot-face smells sun-melon within 10m and will cross the dark for it.
+	var meal := _nearest_melon(n.position)
+	if meal.is_empty():
+		n.velocity.x = dir.x * sp
+		n.velocity.z = dir.y * sp
+		return
+	var mp: Vector3 = meal["pos"]
+	var md := Vector2(mp.x - n.position.x, mp.z - n.position.z)
+	if md.length() < 1.2:
+		meal["taken"] = true
+		(meal["node"] as Node3D).visible = false
+		e["hp"] = e["maxhp"]
+		e["sp"] = float(e["sp"]) + 0.4
+		n.scale *= 1.08
+		announce("Tuhkanaama devours a sun-melon. Its teeth glow brighter.")
+		play_sfx(SFX_COIN)
+		n.velocity.x = 0.0
+		n.velocity.z = 0.0
+	else:
+		var mdir: Vector2 = md / maxf(md.length(), 0.001)
+		n.velocity.x = mdir.x * sp * 1.15
+		n.velocity.z = mdir.y * sp * 1.15
+
 func _spawn_minion(at: Vector3) -> void:
 	var cell := Vector2i(clampi(int(at.x / CELL), 1, TW - 2), clampi(int(at.z / CELL), 1, TH - 2))
 	var e := _new_enemy(cell, "chase", false, false, 0.0)
@@ -508,6 +592,10 @@ func _pickup_update() -> void:
 			elif ex["kind"] == "sharp":
 				knife_dmg = 2
 				announce("Sharp knife: double damage.")
+			elif ex["kind"] == "melon":
+				hp = mini(max_hp, hp + 1)
+				score += 25
+				announce("Sun-melon: sweet. +1 HP. The soot-face smells the rind.")
 			else:
 				speed_bonus += 1.0
 				announce("Boots: faster.")
@@ -801,7 +889,12 @@ func _build_room_nodes() -> void:
 			col = Color(1.0, 0.84, 0.0)
 		elif ex["kind"] == "boots":
 			col = Color(0.29, 0.17, 0.07)
-		var node := _box(Vector3(0.45, 0.45, 0.45), _mat(col, col, 0.8))
+		elif ex["kind"] == "melon":
+			col = Color(0.1, 0.55, 0.2)
+		var msize := Vector3(0.45, 0.45, 0.45)
+		if ex["kind"] == "melon":
+			msize = Vector3(0.7, 0.55, 0.55) # heavy sun-melon
+		var node := _box(msize, _mat(col, col, 0.8))
 		node.position = Vector3(p.x * CELL, 0.9, p.y * CELL)
 		room_node.add_child(node)
 		ex["pos"] = Vector3(p.x * CELL, 0.0, p.y * CELL)
@@ -848,6 +941,13 @@ func _build_enemy_node(e: Dictionary) -> void:
 	var eyes := _box(Vector3(0.5 * scale_f, 0.16 * scale_f, 0.1), _mat(Color(1, 1, 1), Color(1, 1, 1), 0.7))
 	eyes.position = Vector3(0, 1.15 * scale_f, -0.32 * scale_f)
 	n.add_child(eyes)
+	if e["type"] == "tuhkanaama":
+		# white glowing teeth, seed-spitting grin
+		var grin := _mat(Color(1, 1, 1), Color(1, 1, 0.9), 1.6)
+		for tx in [-0.18, -0.06, 0.06, 0.18]:
+			var tooth := _box(Vector3(0.09 * scale_f, 0.14 * scale_f, 0.06), grin)
+			tooth.position = Vector3(tx * scale_f, 0.92 * scale_f, -0.34 * scale_f)
+			n.add_child(tooth)
 	n.position = Vector3(p.x * CELL, 0.1, p.y * CELL)
 	(room_node if room_node else self).add_child(n)
 	e["node"] = n
@@ -884,6 +984,7 @@ func _build_hud() -> void:
 	hud_cap.size = Vector2(1100, 40)
 	hud_cap.add_theme_font_size_override("font_size", 15)
 	hud_cap.add_theme_color_override("font_color", Color(1, 1, 0.4))
+	hud_cap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	layer.add_child(hud_cap)
 	var portrait := TextureRect.new()
 	portrait.texture = load("res://assets/femboy.png") as Texture2D
@@ -896,9 +997,10 @@ func _build_hud() -> void:
 	minimap.position = Vector2(1152 - 20 * 8 - 24, 44)
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", "Seeded caves. Modifiers. Permadeath.\nNo tears. Only knife.\n\nWASD move | Arrows turn | SPACE slash | R reroll | P pause\n\nPress ENTER to spawn")
+	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_INTRO + "\n\nWASD move | Arrows turn | SPACE slash | R reroll | P pause | C codex\n\nPress ENTER to spawn")
 	dead_panel = _overlay(layer, "YOU DIED", "The cave keeps the knife.\nPress ENTER for a new cave.")
-	win_panel = _overlay(layer, "DELIVERED!", "The caterpillar crawls home.\nPress ENTER for a new cave.")
+	win_panel = _overlay(layer, "DELIVERED!", LORE_OUTRO + "\nPress ENTER for a new cave.")
+	codex_panel = _overlay(layer, "THE CAVE REMEMBERS", _codex_text())
 	pause_label = Label.new()
 	pause_label.text = "PAUSED — ENTER or P to resume"
 	pause_label.position = Vector2(400, 300)
@@ -938,8 +1040,44 @@ func _refresh_overlays() -> void:
 	title_panel.visible = state == "title"
 	dead_panel.visible = state == "dead"
 	win_panel.visible = state == "win"
+	if state != "play":
+		codex_panel.visible = false
 	pause_label.visible = state == "play" and paused_game
 	_refresh_hud()
+
+func _codex_text() -> String:
+	var t := "=== creation ===\n" + LORE_INTRO + "\n\n=== rooms ===\n"
+	for i in LORE_ROOMS.size():
+		t += LORE_ROOMS[i] + "\n\n"
+	t += "=== daemons ===\n"
+	for k in ["chase", "dash", "tuhkanaama", "boss"]:
+		t += String(LORE_ENEMIES[k]) + "\n\n"
+	t += "=== findings ===\n"
+	for k in ["crys", "heart", "sharp", "boots", "melon"]:
+		t += String(LORE_ITEMS[k]) + "\n\n"
+	t += "=== exit ===\n" + LORE_EXIT + "\n"
+	return t
+
+func _lore_sightings() -> void:
+	var pp := player_node.position
+	for e in enemies:
+		if e["dead"]:
+			continue
+		var ep: Vector3 = (e["node"] as Node3D).position
+		if pp.distance_to(ep) > 7.0:
+			continue
+		var key := "seen_" + String(e["type"])
+		if not seen.get(key, false):
+			seen[key] = true
+			announce(String(LORE_ENEMIES[e["type"]]))
+			return
+	for ex in extras:
+		if ex["taken"] or ex["kind"] != "melon":
+			continue
+		if pp.distance_to(ex["pos"]) < 4.0 and not seen.get("seen_melon", false):
+			seen["seen_melon"] = true
+			announce(LORE_ITEMS["melon"])
+			return
 
 func show_title() -> void:
 	state = "title"
@@ -976,17 +1114,26 @@ func _autoplay(delta: float) -> void:
 		return
 	if state != "play" or auto_t < 30:
 		return
-	# cheat-walk the critical path: nearest crystal, else exit
+	# cheat-walk the critical path: melons on even cycles, else crystals, else exit
 	if auto_t % 240 == 0:
 		var target := Vector3(EXIT_CELL.x * CELL, 0, EXIT_CELL.y * CELL)
 		var best := 1e9
-		for it in items:
-			if it["taken"]:
-				continue
-			var d: float = player_node.position.distance_to(it["pos"])
-			if d < best:
-				best = d
-				target = it["pos"]
+		if (auto_t / 240) % 2 == 0:
+			for ex in extras:
+				if ex["taken"] or ex["kind"] != "melon":
+					continue
+				var d: float = player_node.position.distance_to(ex["pos"])
+				if d < best:
+					best = d
+					target = ex["pos"]
+		if best > 1e8:
+			for it in items:
+				if it["taken"]:
+					continue
+				var d: float = player_node.position.distance_to(it["pos"])
+				if d < best:
+					best = d
+					target = it["pos"]
 		if room_clear():
 			target = Vector3(EXIT_CELL.x * CELL, 0, EXIT_CELL.y * CELL)
 		player_node.position = target + Vector3(0.5, 0.1, 0.0)
