@@ -185,6 +185,7 @@ var ball_base: Panel
 var ball_knob: Panel
 var touch_layer: CanvasLayer
 var has_touch := false
+var jump_node: Node2D
 
 func _hs_load() -> void:
 	if not FileAccess.file_exists("user://best.cfg"): return
@@ -204,6 +205,9 @@ func _ready() -> void:
 	_build_environment()
 	_build_player()
 	_build_hud()
+	jump_node = (load("res://ski_jump.gd") as GDScript).new()
+	jump_node.visible = false
+	add_child(jump_node)
 	_build_audio()
 	_build_voice_bank()
 	_hs_load()
@@ -1118,6 +1122,8 @@ func _input(event: InputEvent) -> void:
 		if event.pressed:
 			var pos0: Vector2 = event.position
 			var on_btn0 := (pos0.x > vp.x * 0.62 and pos0.y > vp.y * 0.62) or (pos0.x > vp.x - 80.0 and pos0.y < 240.0)
+			if is_instance_valid(jump_node) and jump_node.visible:
+				return
 			if state == "title" or state == "dead" or state == "win":
 				start_run(rng.randi() if state != "title" else int(Time.get_unix_time_from_system()) % 100000)
 				return
@@ -1180,6 +1186,8 @@ func _input(event: InputEvent) -> void:
 			touch_move = d
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if is_instance_valid(jump_node) and jump_node.visible:
+			return
 		if state == "title" or state == "dead" or state == "win":
 			start_run(rng.randi() if state != "title" else int(Time.get_unix_time_from_system()) % 100000)
 			return
@@ -1201,13 +1209,21 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		var k: int = event.physical_keycode
+		if k == KEY_J and (state == "title" or state == "play" or state == "dead" or state == "win"):
+			if is_instance_valid(jump_node):
+				jump_node.visible = not jump_node.visible
+			return
 		if k == KEY_ENTER or k == KEY_KP_ENTER:
+			if is_instance_valid(jump_node) and jump_node.visible:
+				return
 			if state == "title" or state == "dead" or state == "win":
 				start_run(rng.randi() if state != "title" else int(Time.get_unix_time_from_system()) % 100000)
 			elif state == "play" and paused_game:
 				paused_game = false
 				_refresh_overlays()
 		elif k == KEY_R and state == "play":
+			if is_instance_valid(jump_node) and jump_node.visible:
+				return
 			if r_arm_t <= 0.0:
 				r_arm_t = 2.0
 				announce("Press R again to abandon run")
@@ -1245,6 +1261,8 @@ func _process(delta: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	if state != "play" or paused_game:
+		return
+	if is_instance_valid(jump_node) and jump_node.visible:
 		return
 	# --- turn ---
 	var turn := 0.0
@@ -2235,7 +2253,7 @@ func _build_hud() -> void:
 	minimap.offset_bottom = 156
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. Left thumb move, right thumb look, KNIFE hold to slash, M mute.")
+	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER cave | J ski jump. Left thumb move, BALL to look, KNIFE hold to slash, M mute.")
 	var title_tex := TextureRect.new()
 	title_tex.texture = load("res://assets/caterpillar.png") as Texture2D
 	title_tex.custom_minimum_size = Vector2(560, 180)
