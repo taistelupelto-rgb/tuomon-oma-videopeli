@@ -1165,7 +1165,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenDrag:
 		if event.index == ball_id:
 			if state == "play" and not paused_game:
-				yaw -= event.relative.x * 0.006
+				yaw += event.relative.x * 0.006
 				cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
 			if is_instance_valid(ball_base) and is_instance_valid(ball_knob):
 				var boff: Vector2 = (event.position - ball_origin) / 80.0
@@ -1195,13 +1195,13 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 		if _ball_rect().has_point(event.position):
 			if state == "play" and not paused_game:
-				yaw -= event.relative.x * 0.006
+				yaw += event.relative.x * 0.006
 				cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
 			return
 		return
 	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_MIDDLE) != 0:
 		if state == "play" and not paused_game:
-			yaw -= event.relative.x * 0.006
+			yaw += event.relative.x * 0.006
 			cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -1264,9 +1264,9 @@ func _physics_process(delta: float) -> void:
 	# --- turn ---
 	var turn := 0.0
 	if Input.is_physical_key_pressed(KEY_LEFT):
-		turn -= 1.0
-	if Input.is_physical_key_pressed(KEY_RIGHT):
 		turn += 1.0
+	if Input.is_physical_key_pressed(KEY_RIGHT):
+		turn -= 1.0
 	if autoplay:
 		turn = 0.0
 		var foe := _bot_nearest_foe()
