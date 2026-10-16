@@ -114,6 +114,10 @@ var hero_sprite: Sprite3D
 var hero_tex1: Texture2D
 var hero_tex2: Texture2D
 var hero_tex_slash: Texture2D
+var slash_arc: Sprite3D
+var slash_arc_tex: Texture2D
+var shadow_tex: Texture2D
+var shadow_mat: StandardMaterial3D
 var yaw := 0.0
 var cam_pitch := -0.2
 var walk_phase := 0.0
@@ -445,6 +449,24 @@ const MELON := [
 	"................",
 	"................",
 ]
+const ARC_SLASH := [
+	"................",
+	".........WW.....",
+	".......WW.......",
+	"......WW........",
+	".....WW.........",
+	"....WW..........",
+	"....W...........",
+	"...WW...........",
+	"...WW...........",
+	"....W...........",
+	"....WW..........",
+	".....WW.........",
+	"......WW........",
+	".......WW.......",
+	".........WW.....",
+	"................",
+]
 
 func _pixel_tex(rows: Array, pal: Dictionary) -> ImageTexture:
 	var h := rows.size()
@@ -486,6 +508,64 @@ func _sprite3d(tex: Texture2D, pixel_size: float, y: float) -> Sprite3D:
 	s.pixel_size = pixel_size
 	s.position = Vector3(0, y, 0)
 	return s
+
+func _get_shadow_tex() -> Texture2D:
+	if shadow_tex != null:
+		return shadow_tex
+	var img := Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	for y in 16:
+		for x in 16:
+			var d := Vector2(x - 7.5, y - 7.5).length()
+			var a := clampf(1.0 - d / 8.0, 0.0, 1.0)
+			img.set_pixel(x, y, Color(0, 0, 0, a))
+	shadow_tex = ImageTexture.create_from_image(img)
+	return shadow_tex
+
+func _get_shadow_mat() -> StandardMaterial3D:
+	if shadow_mat != null:
+		return shadow_mat
+	shadow_mat = StandardMaterial3D.new()
+	shadow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	shadow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	shadow_mat.albedo_color = Color(0, 0, 0, 0.55)
+	shadow_mat.albedo_texture = _get_shadow_tex()
+	return shadow_mat
+
+func _add_shadow(parent: Node3D, size: float) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(1, 1) * size
+	pm.material = _get_shadow_mat()
+	mi.mesh = pm
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = Vector3(0, 0.03, 0)
+	parent.add_child(mi)
+	return mi
+
+func _poof(pos: Vector3, color: Color) -> void:
+	var p := CPUParticles3D.new()
+	p.amount = 14
+	p.lifetime = 0.5
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.direction = Vector3(0, 1, 0)
+	p.spread = 45.0
+	p.initial_velocity_min = 3.0
+	p.initial_velocity_max = 3.0
+	p.gravity = Vector3(0, -6, 0)
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.12, 0.12, 0.12)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = color
+	bm.material = m
+	p.mesh = bm
+	p.position = pos
+	(room_node if room_node else self).add_child(p)
+	p.emitting = true
+	var tree := get_tree()
+	if tree != null:
+		tree.create_timer(1.2).timeout.connect(p.queue_free)
 
 func _enemy_tex(etype: String, boss: bool) -> Array:
 	if boss:
@@ -889,6 +969,14 @@ func _physics_process(delta: float) -> void:
 			hero_sprite.texture = hero_tex1 if int(walk_phase * 2.0) % 2 == 0 else hero_tex2
 		else:
 			hero_sprite.texture = hero_tex1
+	if is_instance_valid(slash_arc):
+		slash_arc.visible = attack_t > 0.0
+		if slash_arc.visible:
+			var face := Vector3(-sin(yaw), 0, -cos(yaw))
+			slash_arc.position = player_node.position + face * 1.6 + Vector3(0, 1.0, 0)
+			var sa := slash_arc.modulate
+			sa.a = clampf(attack_t / 0.28, 0.0, 1.0)
+			slash_arc.modulate = sa
 	# --- enemies, pickups, exit, spikes ---
 	_enemy_update(delta)
 	_pickup_update()
@@ -922,6 +1010,7 @@ func _knife_hits() -> void:
 		probe_hits += 1
 		e["hp"] = int(e["hp"]) - knife_dmg
 		e["cool"] = 0.35
+		e["flash"] = 0.12
 		combo += 1
 		combo_t = 3.0
 		play_sfx(SFX_HIT)
@@ -975,6 +1064,7 @@ func _kill_enemy(e: Dictionary) -> void:
 	score += gain + combo * 5
 	play_sfx(SFX_HIT2)
 	(e["node"] as Node3D).visible = false
+	_poof((e["node"] as Node3D).position + Vector3(0, 0.8, 0), Color(1.0, 0.84, 0.0) if e["boss"] else Color(1.0, 0.35, 0.3))
 	if e["boss"]:
 		announce("WARDEN DOWN! Reach the glowing exit.")
 		play_sfx(SFX_WARDEN)
@@ -988,6 +1078,8 @@ func _enemy_update(delta: float) -> void:
 		if e["dead"]:
 			continue
 		var n: CharacterBody3D = e["node"]
+		if float(e.get("flash", 0.0)) > 0.0:
+			e["flash"] = maxf(0.0, float(e.get("flash", 0.0)) - delta)
 		if e.get("enslaved", false):
 			_chain_follow(e, n)
 			continue
@@ -1012,13 +1104,11 @@ func _enemy_update(delta: float) -> void:
 			elif e["mode"] == "tele":
 				n.velocity.x = 0.0
 				n.velocity.z = 0.0
-				(e["sprite"] as Sprite3D).modulate = Color(3, 3, 3)
 				if e["t"] <= 0.0:
 					e["mode"] = "lunge"
 					e["t"] = 0.45
 					e["vx"] = dir.x * sp * 3.2
 					e["vz"] = dir.y * sp * 3.2
-					(e["sprite"] as Sprite3D).modulate = e["base_mod"]
 			else:
 				n.velocity.x = float(e["vx"])
 				n.velocity.z = float(e["vz"])
@@ -1028,6 +1118,14 @@ func _enemy_update(delta: float) -> void:
 		else:
 			n.velocity.x = dir.x * sp
 			n.velocity.z = dir.y * sp
+		var _spr: Sprite3D = e.get("sprite")
+		if _spr != null:
+			if float(e.get("flash", 0.0)) > 0.0:
+				_spr.modulate = Color(4, 4, 4)
+			elif String(e.get("mode", "stalk")) == "tele":
+				_spr.modulate = Color(3, 3, 3)
+			else:
+				_spr.modulate = e.get("base_mod", Color(1, 1, 1))
 		if not n.is_on_floor():
 			n.velocity.y -= 22.0 * delta
 		else:
@@ -1047,13 +1145,11 @@ func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, de
 	elif e["mode"] == "tele":
 		n.velocity.x = 0.0
 		n.velocity.z = 0.0
-		(e["sprite"] as Sprite3D).modulate = Color(3, 3, 3)
 		if e["t"] <= 0.0:
 			e["mode"] = "charge"
 			e["t"] = 0.8
 			e["vx"] = dir.x * 9.0
 			e["vz"] = dir.y * 9.0
-			(e["sprite"] as Sprite3D).modulate = e["base_mod"]
 	else:
 		n.velocity.x = float(e["vx"])
 		n.velocity.z = float(e["vz"])
@@ -1390,6 +1486,13 @@ func _build_player() -> void:
 		hero_tex_slash = _pixel_tex(HERO_SLASH, pal)
 	hero_sprite = _sprite3d(hero_tex1, 0.08, 0.75)
 	player_node.add_child(hero_sprite)
+	var psh := _add_shadow(player_node, 1.2)
+	psh.position = Vector3(0, -0.05, 0)
+	if slash_arc_tex == null:
+		slash_arc_tex = _pixel_tex(ARC_SLASH, {"W": Color(1, 1, 1)})
+	slash_arc = _sprite3d(slash_arc_tex, 0.09, 0.0)
+	slash_arc.visible = false
+	add_child(slash_arc)
 	add_child(player_node)
 	# chase camera rig: yaw + shoulder offset, spring arm pulls in on walls
 	cam_rig = Node3D.new()
@@ -1414,8 +1517,12 @@ func _build_room_nodes() -> void:
 	room_node = Node3D.new()
 	room_node.name = "Room"
 	add_child(room_node)
-	var floor_a := _mat(Color(0.23, 0.18, 0.15))
-	var floor_b := _mat(Color(0.17, 0.14, 0.11))
+	var floor_mats: Array = [
+		_mat(Color(0.23, 0.18, 0.15)),
+		_mat(Color(0.20, 0.155, 0.13)),
+		_mat(Color(0.17, 0.14, 0.11)),
+		_mat(Color(0.19, 0.155, 0.125)),
+	]
 	var ceil_m := _mat(Color(0.04, 0.04, 0.09))
 	var wall_m := _mat(Color(0.42, 0.35, 0.28))
 	var pillar_m := _mat(Color(0.35, 0.35, 0.4))
@@ -1436,7 +1543,8 @@ func _build_room_nodes() -> void:
 		for mx in TW:
 			var wx := mx * CELL
 			var wz := my * CELL
-			var t := _box(Vector3(CELL * 0.98, 0.08, CELL * 0.98), floor_a if (mx + my) % 2 == 0 else floor_b)
+			var fidx := ((mx + my) % 2) * 2 + ((mx * 7 + my * 13) % 2)
+			var t := _box(Vector3(CELL * 0.98, 0.08, CELL * 0.98), floor_mats[fidx])
 			t.position = Vector3(wx, -0.04, wz)
 			room_node.add_child(t)
 			var c := _box(Vector3(CELL * 0.98, 0.08, CELL * 0.98), ceil_m)
@@ -1489,6 +1597,8 @@ func _build_room_nodes() -> void:
 		it["pos"] = Vector3(p.x * CELL, 0.0, p.y * CELL)
 		it["node"] = cnode
 		it["taken"] = false
+		var ish := _add_shadow(room_node, 0.7)
+		ish.position = Vector3(p.x * CELL, 0.03, p.y * CELL)
 	for ex in extras:
 		var p: Vector2i = ex["cell"]
 		var xpair: Array = _item_tex(String(ex["kind"]))
@@ -1498,6 +1608,8 @@ func _build_room_nodes() -> void:
 		ex["pos"] = Vector3(p.x * CELL, 0.0, p.y * CELL)
 		ex["node"] = node
 		ex["taken"] = false
+		var xsh := _add_shadow(room_node, 0.7)
+		xsh.position = Vector3(p.x * CELL, 0.03, p.y * CELL)
 	for e in enemies:
 		_build_enemy_node(e)
 
@@ -1527,6 +1639,8 @@ func _build_enemy_node(e: Dictionary) -> void:
 	if e["elite"]:
 		base_mod = Color(1.5, 0.9, 0.5)
 	sprite.modulate = base_mod
+	var esh := _add_shadow(n, 1.0 * scale_f)
+	esh.position = Vector3(0, -0.05, 0)
 	if e.get("enslaved", false):
 		_add_collar(n) # chains travel between rooms
 	n.position = Vector3(p.x * CELL, 0.1, p.y * CELL)
