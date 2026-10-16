@@ -73,6 +73,7 @@ const SFX_WIN := preload("res://assets/sfx/you_win.ogg")
 const SFX_DEATH := preload("res://assets/sfx/game_over.ogg")
 const SFX_CHAINED := preload("res://assets/sfx/chained.ogg")
 const SFX_WARDEN := preload("res://assets/sfx/warden_down.ogg")
+const VOICE_TEXT := preload("res://assets/voices/voices_text.gd")
 
 const VOICE_COUNTS := {"room_a": 8, "room_b": 8, "room_c": 8, "room_d": 8,
 	"foe_chase": 8, "foe_dash": 8, "foe_tuhk": 8, "boss_see": 6,
@@ -199,6 +200,9 @@ func say(cat: String) -> void:
 		voice_cache[f] = stream
 	voice_cd = 5.0
 	play_sfx(stream)
+	var sub: String = VOICE_TEXT.LINES.get(f, "")
+	if sub != "":
+		announce(sub)
 
 # ---------------- run / rooms ----------------
 
