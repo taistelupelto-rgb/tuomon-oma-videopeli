@@ -90,7 +90,8 @@ const JOKER_BG := preload("res://assets/joker.jpg")
 const SFX_SCREAM := preload("res://assets/sfx/death_scream.ogg")
 const SFX_LAUGH := preload("res://assets/sfx/death_laugh.ogg")
 const SFX_CHAIN := preload("res://assets/sfx/chain_rattle.ogg")
-const SEED_CD := 1.2
+const SFX_PLOP := preload("res://assets/sfx/seed_plop.ogg")
+const SEED_CD := 2.0
 const SEED_RANGE := 16.0
 const SEED_SPEED := 12.0
 const MUSIC_STREAM := preload("res://assets/music.mp3")
@@ -1560,6 +1561,7 @@ func _chained_guns(delta: float) -> void:
 		n.position = from
 		(room_node if room_node else self).add_child(n)
 		seeds.append({"node": n, "vel": dir * SEED_SPEED + Vector3(0, 1.0, 0), "t": 0.0})
+		play_sfx(SFX_PLOP) # plop!
 # ---------------- shit bomb: arcing turd, radial splash, pooling splats ----
 func _shit_mat() -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
