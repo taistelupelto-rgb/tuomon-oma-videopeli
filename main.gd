@@ -191,6 +191,16 @@ var dead_bg: TextureRect
 var death_scream_player: AudioStreamPlayer
 var death_laugh_player: AudioStreamPlayer
 var death_laugh_t := -1.0
+var cs_active := false
+var cs_lines: Array = []
+var cs_i := 0
+var cs_t := 0.0
+var cs_cache := {}
+var cs_dim: ColorRect
+var cs_panel: PanelContainer
+var cs_title: Label
+var cs_cap: Label
+var cs_player: AudioStreamPlayer
 var win_panel: PanelContainer
 var codex_panel: PanelContainer
 var seen := {}
@@ -884,7 +894,7 @@ func _load_room(idx: int, keep_chained := true) -> void:
 	if idx == 3:
 		play_sfx(SFX_FINAL)
 		announce("FINAL ROUND — " + d["about"])
-	say("room_" + ["a", "b", "c", "d"][idx])
+	_play_cutscene(idx)
 
 func _pick_exit_cell() -> Vector2i:
 	if rng.randf() < 0.6:
@@ -1164,6 +1174,9 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var vp := get_viewport().get_visible_rect().size
 		if event.pressed:
+			if cs_active:
+				_cs_end()
+				return
 			var pos0: Vector2 = event.position
 			var on_btn0 := (pos0.x > vp.x * 0.62 and pos0.y > vp.y * 0.62) or (pos0.x > vp.x - 80.0 and pos0.y < 240.0)
 			if is_instance_valid(jump_node) and jump_node.visible:
@@ -1249,6 +1262,9 @@ func _input(event: InputEvent) -> void:
 			touch_move = d
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if cs_active:
+			_cs_end()
+			return
 		if is_instance_valid(jump_node) and jump_node.visible:
 			return
 		if state == "title" or state == "dead" or state == "win":
@@ -1279,6 +1295,9 @@ func _input(event: InputEvent) -> void:
 				jump_node.visible = not jump_node.visible
 			return
 		if k == KEY_ENTER or k == KEY_KP_ENTER:
+			if cs_active:
+				_cs_end()
+				return
 			if is_instance_valid(jump_node) and jump_node.visible:
 				return
 			if state == "title" or state == "dead" or state == "win":
@@ -1305,6 +1324,8 @@ func _input(event: InputEvent) -> void:
 			announce("Muted" if AudioServer.is_bus_mute(0) else "Sound on")
 		elif k == KEY_G and state == "play" and not paused_game:
 			throw_shitbomb()
+		elif k == KEY_SPACE and cs_active:
+			_cs_end()
 		elif state == "play" and not paused_game and k >= KEY_1 and k <= KEY_8:
 			inv_use(k - KEY_1)
 
@@ -1324,13 +1345,17 @@ func _process(delta: float) -> void:
 		death_laugh_t -= delta
 		if death_laugh_t < 0.0 and state == "dead" and death_laugh_player != null:
 			death_laugh_player.play()
+	if cs_active:
+		cs_t -= delta
+		if cs_t <= 0.0:
+			_cs_next()
 	if tick % 1800 == 0:
 		say("idle")
 	if autoplay:
 		_autoplay(delta)
 
 func _physics_process(delta: float) -> void:
-	if state != "play" or paused_game:
+	if state != "play" or paused_game or cs_active:
 		return
 	if is_instance_valid(jump_node) and jump_node.visible:
 		return
@@ -1571,7 +1596,7 @@ func _shit_mat() -> StandardMaterial3D:
 	return m
 
 func throw_shitbomb() -> void:
-	if state != "play" or paused_game:
+	if state != "play" or paused_game or cs_active:
 		return
 	if shit_ammo <= 0:
 		announce("Shit bomb reloading...")
@@ -2655,6 +2680,58 @@ func _build_hud() -> void:
 	add_child(death_laugh_player)
 	win_panel = _overlay(layer, "ENSLAVED AND DELIVERED!", "A chained tuhkanaama kneels at the glowing exit. The cave releases its master.\n\n" + LORE_OUTRO + "\nTap or ENTER for a new cave.")
 	codex_panel = _overlay(layer, "THE CAVE REMEMBERS", _codex_text(), "CLOSE")
+	# cutscene stage: dim + card + faces + caption + skip, raised on every level change
+	cs_dim = ColorRect.new()
+	cs_dim.color = Color(0, 0, 0, 0.6)
+	cs_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cs_dim.visible = false
+	layer.add_child(cs_dim)
+	cs_panel = PanelContainer.new()
+	cs_panel.set_anchors_preset(Control.PRESET_CENTER)
+	cs_panel.offset_left = -330
+	cs_panel.offset_top = -250
+	cs_panel.offset_right = 330
+	cs_panel.offset_bottom = 250
+	cs_panel.custom_minimum_size = Vector2(660, 420)
+	var cs_vb := VBoxContainer.new()
+	cs_panel.add_child(cs_vb)
+	cs_title = Label.new()
+	cs_title.add_theme_font_size_override("font_size", 28)
+	cs_title.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	cs_vb.add_child(cs_title)
+	var cs_faces := HBoxContainer.new()
+	cs_faces.alignment = BoxContainer.ALIGNMENT_CENTER
+	cs_faces.add_theme_constant_override("separation", 24)
+	cs_vb.add_child(cs_faces)
+	var cs_mom := TextureRect.new()
+	cs_mom.texture = load("res://assets/caterpillar.png") as Texture2D
+	cs_mom.custom_minimum_size = Vector2(140, 110)
+	cs_mom.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	cs_mom.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cs_faces.add_child(cs_mom)
+	var cs_hero := TextureRect.new()
+	cs_hero.texture = load("res://assets/femboy.png") as Texture2D
+	cs_hero.custom_minimum_size = Vector2(110, 110)
+	cs_hero.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	cs_hero.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cs_faces.add_child(cs_hero)
+	cs_cap = Label.new()
+	cs_cap.add_theme_font_size_override("font_size", 20)
+	cs_cap.add_theme_color_override("font_color", Color(1, 1, 0.85))
+	cs_cap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cs_cap.custom_minimum_size = Vector2(600, 90)
+	cs_vb.add_child(cs_cap)
+	var cs_skip := Button.new()
+	cs_skip.text = "SKIP >>"
+	cs_skip.add_theme_font_size_override("font_size", 22)
+	cs_skip.focus_mode = Control.FOCUS_NONE
+	cs_skip.pressed.connect(_cs_end)
+	cs_vb.add_child(cs_skip)
+	cs_panel.visible = false
+	layer.add_child(cs_panel)
+	cs_player = AudioStreamPlayer.new()
+	cs_player.volume_db = -4.0
+	add_child(cs_player)
 	pause_label = Label.new()
 	pause_label.text = "PAUSED — TAP, ENTER or P to resume"
 	pause_label.set_anchors_preset(Control.PRESET_CENTER)
@@ -2673,6 +2750,52 @@ func _build_hud() -> void:
 	layer.add_child(_dmg)
 	dmg_rect = _dmg
 	_build_touch()
+
+func _cs_clip(idx: int, n: int) -> String:
+	return "cs_%s_%02d.ogg" % [["a", "b", "c", "d"][idx], n]
+
+func _play_cutscene(idx: int) -> void:
+	# two bangers per level: mother, then hero. World waits, skip always works.
+	cs_lines = [
+		{"file": _cs_clip(idx, 1), "who": "MOTHER"},
+		{"file": _cs_clip(idx, 2), "who": "HERO"},
+	]
+	cs_i = -1
+	var d: Dictionary = ROOM_DEFS[idx]
+	cs_title.text = "LEVEL %d — %s" % [idx + 1, String(d.get("name", "???"))]
+	cs_dim.visible = true
+	cs_panel.visible = true
+	cs_active = true
+	_cs_next()
+
+func _cs_next() -> void:
+	cs_i += 1
+	if cs_i >= cs_lines.size():
+		_cs_end()
+		return
+	var f: String = cs_lines[cs_i]["file"]
+	var stream: AudioStream = cs_cache.get(f)
+	if stream == null:
+		stream = load("res://assets/voices/" + f) as AudioStream
+		if stream == null:
+			_cs_next()
+			return
+		cs_cache[f] = stream
+	cs_cap.text = "%s: %s" % [String(cs_lines[cs_i]["who"]), String(VOICE_TEXT.LINES.get(f, "..."))]
+	cs_player.stream = stream
+	cs_player.play()
+	cs_t = stream.get_length() + 1.0
+
+func _cs_end() -> void:
+	cs_active = false
+	cs_lines = []
+	cs_i = 0
+	if cs_player != null and cs_player.playing:
+		cs_player.stop()
+	if is_instance_valid(cs_dim):
+		cs_dim.visible = false
+	if is_instance_valid(cs_panel):
+		cs_panel.visible = false
 
 func _overlay(layer: CanvasLayer, title: String, body: String, btn_text: String = "TAP TO START / CONTINUE") -> PanelContainer:
 	var pc := PanelContainer.new()
@@ -3072,6 +3195,9 @@ func _bot_nearest_foe() -> Dictionary:
 
 func _autoplay(delta: float) -> void:
 	auto_t += 1
+	if cs_active:
+		_cs_end() # smoke hook watches gameplay, not cinema
+		return
 	if auto_t % 600 == 0:
 		print("[autoplay] t=%d state=%s room=%d hp=%d chain=%d score=%d foes=%d swings=%d calls=%d minarc=%.2f hits=%d inv=%s yaw=%.2f" % [auto_t, state, ri, hp, _chained_count(), score, enemies.size(), probe_swings, probe_calls, probe_min_arc, probe_hits, _inv_text(), yaw])
 		for e in enemies:

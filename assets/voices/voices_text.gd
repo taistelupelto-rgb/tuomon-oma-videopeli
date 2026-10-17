@@ -201,5 +201,13 @@ const LINES := {
 	"exit_open_01.ogg": "The door glows green! Through we go!",
 	"exit_open_02.ogg": "Room clear! The exit calls us!",
 	"exit_open_03.ogg": "Open path! Haul everything to daylight!",
-	"exit_open_04.ogg": "Gold means master! We earned this!"
+	"exit_open_04.ogg": "Gold means master! We earned this!",
+	"cs_a_01.ogg": "Welcome to my basement, hero. Mind the smell. That is just centuries of motherhood.",
+	"cs_a_02.ogg": "You birthed a whole cave, and YOU complain about MY shit trail?",
+	"cs_b_01.ogg": "Cross the bridge, darling. The daemons ate the last plumber, so no flushing.",
+	"cs_b_02.ogg": "If I fall, tell my femboy portrait I died hydrated.",
+	"cs_c_01.ogg": "This room thinks, child. Mostly about how you missed that crystal. Twice.",
+	"cs_c_02.ogg": "My knife and I have an understanding. It does the thinking, I do the screaming.",
+	"cs_d_01.ogg": "The Warden ate my in-laws. Honestly? Best catering decision I ever made.",
+	"cs_d_02.ogg": "I brought seeds, knife, and unresolved trauma. Let us dance, doggy.",
 }
