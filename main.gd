@@ -722,22 +722,22 @@ const PILLAR_TEX := [
 	"kkddddddddddddkk",
 ]
 const SPIKE_TEX := [
-	"DDDDDDDDDDDDDDDD",
-	"DDDDDDDDDDDDDDDD",
-	".W...W...W...W..",
-	".WS..WS..WS..WS.",
-	".WSs.WSs.WSs.WSs",
-	"WSsSWSsSWSsSWSsS",
-	"WSsSWSsSWSsSWSsS",
-	"sSSsRRRRRRRRsSSs",
-	"sSSsRWRRRRWRsSSs",
-	"sSSSrrrrrrrrSSSs",
+	"RRRRRRRRRRRRRRRR",
+	"RWWRRRWWRRRWWRRR",
+	"RRRRRRRRRRRRRRRR",
+	"rRRRrRRRrRRRrRRR",
 	"DDDDDDDDDDDDDDDD",
 	"DdDdDdDdDdDdDdDd",
-	"dDdDdDdDdDdDdDdD",
+	"DDDDDDDDDDDDDDDD",
+	"ssssssssssssssss",
+	"ssssssssssssssss",
+	"YDYDYDYDYDYDYDYD",
+	"DYDDDDDDDDDDDDDY",
+	"YDYDYDYDYDYDYDYD",
 	"DDDDDDDDDDDDDDDD",
 	"dDdDdDdDdDdDdDdD",
 	"DDDDDDDDDDDDDDDD",
+	"dDdDdDdDdDdDdDdD",
 ]
 const EXIT_TEX := [
 	"DDDDDDDDDDDDDDDD",
@@ -829,6 +829,48 @@ func _sprite3d(tex: Texture2D, pixel_size: float, y: float) -> Sprite3D:
 	s.pixel_size = pixel_size
 	s.position = Vector3(0, y, 0)
 	return s
+
+var halo_tex: Texture2D
+var spike_glow_mat: StandardMaterial3D
+var exit_glow_mat: StandardMaterial3D
+var exit_halo: Sprite3D
+
+func _halo_tex() -> Texture2D:
+	# one shared soft radial glow, tinted per use via modulate
+	if halo_tex != null:
+		return halo_tex
+	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	for y in 32:
+		for x in 32:
+			var d := Vector2(x - 15.5, y - 15.5).length() / 16.0
+			var a := clampf(1.0 - d, 0.0, 1.0)
+			img.set_pixel(x, y, Color(1, 1, 1, a * a))
+	halo_tex = ImageTexture.create_from_image(img)
+	return halo_tex
+
+func _add_halo(parent: Node3D, color: Color, size: float, y: float) -> Sprite3D:
+	var s := Sprite3D.new()
+	s.texture = _halo_tex()
+	s.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	s.shaded = false
+	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+	s.modulate = color
+	s.pixel_size = size / 32.0
+	s.position = Vector3(0, y, 0)
+	s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(s)
+	return s
+
+func _halo_color(kind: String) -> Color:
+	if kind == "heart":
+		return Color(1.0, 0.25, 0.35, 0.55)
+	if kind == "melon":
+		return Color(0.85, 1.0, 0.3, 0.55)
+	if kind == "sharp":
+		return Color(1.0, 0.8, 0.25, 0.6)
+	if kind == "boots":
+		return Color(1.0, 0.55, 0.2, 0.55)
+	return Color(0.3, 1.0, 0.45, 0.55) # crys + default green
 
 func _get_shadow_tex() -> Texture2D:
 	if shadow_tex != null:
@@ -1584,6 +1626,14 @@ func _physics_process(delta: float) -> void:
 		lantern.light_energy = 1.15 + sin(tick * 0.11) * 0.08 + sin(tick * 0.043) * 0.06
 	if is_instance_valid(exit_light):
 		exit_light.light_energy = 1.4 + sin(tick * 0.05) * 0.4
+	# throbbing trap teeth + breathing exit glow
+	if spike_glow_mat != null:
+		spike_glow_mat.emission_energy_multiplier = 1.3 + sin(tick * 0.09) * 0.7
+	if exit_glow_mat != null:
+		exit_glow_mat.emission_energy_multiplier = 1.1 + sin(tick * 0.07) * 0.5
+	if is_instance_valid(exit_halo):
+		var ehs := 4.0 + sin(tick * 0.07) * 0.5
+		exit_halo.pixel_size = ehs / 32.0
 	for t in torches:
 		if is_instance_valid(t):
 			t.light_energy = 0.9 + sin(tick * 0.09 + t.position.x * 1.7 + t.position.z) * 0.12
@@ -1905,6 +1955,8 @@ func _add_leash(e: Dictionary) -> void:
 	link.mesh = bm
 	(room_node if room_node else self).add_child(link)
 	e["leash"] = link
+	if not is_instance_valid(e.get("halo") as Node3D):
+		e["halo"] = _add_halo(e["node"] as Node3D, Color(1.0, 0.8, 0.25, 0.55), 2.4, 0.9)
 
 func _leash_update() -> void:
 	if player_node == null:
@@ -2393,7 +2445,7 @@ func _spike_pal() -> Dictionary:
 		"W": Color(0.95, 0.97, 1.0), "S": Color(0.62, 0.66, 0.72),
 		"s": Color(0.32, 0.35, 0.42), "R": Color(1.0, 0.12, 0.08),
 		"r": Color(0.45, 0.05, 0.05), "D": Color(0.07, 0.07, 0.10),
-		"d": Color(0.16, 0.16, 0.20),
+		"d": Color(0.16, 0.16, 0.20), "Y": Color(0.9, 0.75, 0.1),
 	}
 
 func _exit_pal() -> Dictionary:
@@ -2600,6 +2652,7 @@ func _build_room_nodes() -> void:
 	var wall_m := _pixel_mat(WALL_TEX, CAVE_PAL)
 	var pillar_m := _pixel_mat(PILLAR_TEX, CAVE_PAL)
 	var spike_m := _tex_mat("spike", SPIKE_TEX, _spike_pal(), 1.6)
+	spike_glow_mat = spike_m
 	var rsh := Shader.new()
 	rsh.code = RIVER_SHADER
 	river_mat = ShaderMaterial.new()
@@ -2647,9 +2700,15 @@ func _build_room_nodes() -> void:
 				b.add_child(mi)
 				room_node.add_child(b)
 			elif ch == "s":
-				var s := _box(Vector3(CELL * 0.9, 0.34, CELL * 0.9), spike_m)
-				s.position = Vector3(wx, 0.17, wz)
-				room_node.add_child(s)
+				# a trap that reads as a trap: hazard plate + four red-hot teeth
+				var plate := _box(Vector3(CELL * 0.98, 0.1, CELL * 0.98), spike_m)
+				plate.position = Vector3(wx, 0.05, wz)
+				room_node.add_child(plate)
+				for ox in [-CELL * 0.22, CELL * 0.22]:
+					for oz in [-CELL * 0.22, CELL * 0.22]:
+						var tooth := _box(Vector3(0.5, 1.1, 0.5), spike_m)
+						tooth.position = Vector3(wx + ox, 0.65, wz + oz)
+						room_node.add_child(tooth)
 			elif ch == "w":
 				river_cells.append(Vector2i(mx, my))
 				var wplane := _box(Vector3(CELL * 0.98, 0.06, CELL * 0.98), river_mat)
@@ -2658,9 +2717,12 @@ func _build_room_nodes() -> void:
 			elif ch == "E":
 				exit_node = Area3D.new()
 				exit_node.position = Vector3(wx, 0.0, wz)
-				var pillar := _box(Vector3(1.0, WALL_H, 1.0), _tex_mat("exit", EXIT_TEX, _exit_pal(), 1.2))
+				var emat := _tex_mat("exit", EXIT_TEX, _exit_pal(), 1.2)
+				exit_glow_mat = emat
+				var pillar := _box(Vector3(1.0, WALL_H, 1.0), emat)
 				pillar.position = Vector3(0, WALL_H / 2.0, 0)
 				exit_node.add_child(pillar)
+				exit_halo = _add_halo(exit_node, Color(0.3, 1.0, 0.45, 0.5), 4.0, 1.2)
 				exit_light = OmniLight3D.new()
 				exit_light.position = Vector3(0, 2.0, 0)
 				exit_light.omni_range = 7.0
@@ -2759,6 +2821,7 @@ func _build_room_nodes() -> void:
 		var cnode := _sprite3d(_cached_tex("item_crys", cpair[0], cpair[1]), 0.07, 0.9)
 		cnode.position = Vector3(p.x * CELL, 0.9, p.y * CELL)
 		room_node.add_child(cnode)
+		_add_halo(cnode, _halo_color("crys"), 1.8, 0.0)
 		it["pos"] = Vector3(p.x * CELL, 0.0, p.y * CELL)
 		it["node"] = cnode
 		it["taken"] = false
@@ -2770,6 +2833,7 @@ func _build_room_nodes() -> void:
 		var node := _sprite3d(_cached_tex("item_" + String(ex["kind"]), xpair[0], xpair[1]), 0.07, 0.9)
 		node.position = Vector3(p.x * CELL, 0.9, p.y * CELL)
 		room_node.add_child(node)
+		_add_halo(node, _halo_color(String(ex["kind"])), 1.8, 0.0)
 		ex["pos"] = Vector3(p.x * CELL, 0.0, p.y * CELL)
 		ex["node"] = node
 		ex["taken"] = false
@@ -2808,6 +2872,8 @@ func _build_enemy_node(e: Dictionary) -> void:
 		sprite = _sprite3d(_cached_tex(ekey, pair[0], pair[1]), 0.09, 0.8 * scale_f)
 	sprite.scale = Vector3.ONE * scale_f
 	n.add_child(sprite)
+	if e["boss"]:
+		_add_halo(n, Color(1.0, 0.2, 0.15, 0.55), 3.4, 0.9 * scale_f)
 	var base_mod := Color(1, 1, 1)
 	if e["elite"]:
 		base_mod = Color(1.5, 0.9, 0.5)
