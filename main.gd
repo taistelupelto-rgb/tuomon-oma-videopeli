@@ -1248,13 +1248,13 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 		if _ball_rect().has_point(event.position):
 			if state == "play" and not paused_game:
-				yaw += event.relative.x * 0.006
+				yaw -= event.relative.x * 0.006
 				cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
 			return
 		return
 	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_MIDDLE) != 0:
 		if state == "play" and not paused_game:
-			yaw += event.relative.x * 0.006
+			yaw -= event.relative.x * 0.006
 			cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -1344,7 +1344,7 @@ func _physics_process(delta: float) -> void:
 		ly = 0.0
 	else:
 		ly = signf(ly) * pow((absf(ly) - LOOK_DEAD) / (1.0 - LOOK_DEAD), LOOK_EXPO)
-	yaw += lx * LOOK_YAW * delta
+	yaw -= lx * LOOK_YAW * delta
 	cam_pitch = clampf(cam_pitch + ly * LOOK_PITCH * delta, CAM_PITCH_MIN, CAM_PITCH_MAX)
 	if Input.is_physical_key_pressed(KEY_Q):
 		cam_pitch = min(CAM_PITCH_MAX, cam_pitch + 1.2 * delta)
