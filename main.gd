@@ -14,6 +14,7 @@ const SPAWN_CELL := Vector2i(1, 6)
 const WALK_SPEED := 5.2
 const TURN_SPEED := 2.1
 const LOOK_YAW := 2.4 # right-stick max yaw rate, rad/s
+const BUILD_TAG := "v0.61.3"
 const LOOK_PITCH := 2.6 # right-stick max pitch rate, rad/s
 const LOOK_EXPO := 1.35 # stick curve: fine aim center, fast edges
 const LOOK_DEAD := 0.12 # stick deadzone
@@ -2997,7 +2998,7 @@ func _build_hud() -> void:
 	minimap.offset_bottom = 156
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, right stick to look, KNIFE hold to slash, G shit bomb, M mute.")
+	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D  [" + BUILD_TAG + "]", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, right stick to look, KNIFE hold to slash, G shit bomb, M mute.")
 	var title_tex := TextureRect.new()
 	title_tex.texture = load("res://assets/caterpillar.png") as Texture2D
 	title_tex.custom_minimum_size = Vector2(560, 180)
