@@ -255,8 +255,8 @@ var lantern: OmniLight3D
 var river_mat: Material
 var river_cells: Array = []
 var torches: Array = []
-var rain: GPUParticles3D
-var dust: GPUParticles3D
+var rain: CPUParticles3D
+var dust: CPUParticles3D
 var kill_flash := 0.0
 var kill_rect: ColorRect
 var hitstop_n := 0
@@ -267,7 +267,7 @@ var rings: Array = []
 var plasma: ColorRect
 var last_combo := 0
 var combo_pop := 0.0
-var shit_trail: GPUParticles3D
+var shit_trail: CPUParticles3D
 var hero_moving := false
 var shit_ammo := SHITBOMB_MAX
 var shit_regen_t := 0.0
@@ -2503,19 +2503,17 @@ func _build_environment() -> void:
 	sun.rotation_degrees = Vector3(-48, -35, 0)
 	add_child(sun)
 	# rain streaks falling around the player
-	rain = GPUParticles3D.new()
+	rain = CPUParticles3D.new()
 	rain.amount = 80 if OS.has_feature("web") else 160
 	rain.lifetime = 1.1
 	rain.preprocess = 1.1
-	var pm := ParticleProcessMaterial.new()
-	pm.direction = Vector3(0.1, -1, 0)
-	pm.spread = 6.0
-	pm.initial_velocity_min = 14.0
-	pm.initial_velocity_max = 22.0
-	pm.gravity = Vector3(0, -4, 0)
-	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	pm.emission_box_extents = Vector3(14, 1, 14)
-	rain.process_material = pm
+	rain.direction = Vector3(0.1, -1, 0)
+	rain.spread = 6.0
+	rain.initial_velocity_min = 14.0
+	rain.initial_velocity_max = 22.0
+	rain.gravity = Vector3(0, -4, 0)
+	rain.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	rain.emission_box_extents = Vector3(14, 1, 14)
 	var streak_tex: Texture2D = _cached_tex("rain", RAIN_PX, {
 		"W": Color(0.85, 0.93, 1.0, 1.0),
 		"C": Color(0.6, 0.7, 0.85, 1.0),
@@ -2526,30 +2524,28 @@ func _build_environment() -> void:
 	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	smat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	smat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	smat.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
 	smat.albedo_texture = streak_tex
 	smat.albedo_color = Color(1, 1, 1, 0.9)
 	streak.material = smat
-	rain.draw_pass_1 = streak
+	rain.mesh = streak
 	rain.visibility_aabb = AABB(Vector3(-16, -8, -16), Vector3(32, 16, 32))
 	add_child(rain)
 	# cave dust motes drifting around the hero, basically free
-	dust = GPUParticles3D.new()
+	dust = CPUParticles3D.new()
 	dust.amount = 60
 	dust.lifetime = 5.0
 	dust.preprocess = 5.0
 	dust.local_coords = false
-	var dpm := ParticleProcessMaterial.new()
-	dpm.direction = Vector3(0.3, 0.1, 0.0)
-	dpm.spread = 90.0
-	dpm.initial_velocity_min = 0.2
-	dpm.initial_velocity_max = 0.7
-	dpm.gravity = Vector3.ZERO
-	dpm.scale_min = 0.5
-	dpm.scale_max = 1.2
-	dpm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	dpm.emission_box_extents = Vector3(9, 2.5, 9)
-	dust.process_material = dpm
+	dust.direction = Vector3(0.3, 0.1, 0.0)
+	dust.spread = 90.0
+	dust.initial_velocity_min = 0.2
+	dust.initial_velocity_max = 0.7
+	dust.gravity = Vector3.ZERO
+	dust.scale_amount_min = 0.5
+	dust.scale_amount_max = 1.2
+	dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	dust.emission_box_extents = Vector3(9, 2.5, 9)
 	var mote := SphereMesh.new()
 	mote.radius = 0.035
 	mote.height = 0.07
@@ -2558,31 +2554,29 @@ func _build_environment() -> void:
 	mmat.albedo_color = Color(1.0, 0.88, 0.65, 0.5)
 	mmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mote.material = mmat
-	dust.draw_pass_1 = mote
+	dust.mesh = mote
 	dust.visibility_aabb = AABB(Vector3(-10, -3, -10), Vector3(20, 8, 20))
 	add_child(dust)
 	# hero shit trail: brown lumps drop at the hero's heels and linger behind
-	shit_trail = GPUParticles3D.new()
+	shit_trail = CPUParticles3D.new()
 	shit_trail.amount = 48
 	shit_trail.lifetime = 1.6
 	shit_trail.local_coords = false
-	var tpm := ParticleProcessMaterial.new()
-	tpm.direction = Vector3(0, 1, 0)
-	tpm.spread = 25.0
-	tpm.initial_velocity_min = 0.2
-	tpm.initial_velocity_max = 0.8
-	tpm.gravity = Vector3(0, -3, 0)
-	tpm.scale_min = 0.7
-	tpm.scale_max = 1.3
-	tpm.color = Color(0.35, 0.22, 0.1)
-	shit_trail.process_material = tpm
+	shit_trail.direction = Vector3(0, 1, 0)
+	shit_trail.spread = 25.0
+	shit_trail.initial_velocity_min = 0.2
+	shit_trail.initial_velocity_max = 0.8
+	shit_trail.gravity = Vector3(0, -3, 0)
+	shit_trail.scale_amount_min = 0.7
+	shit_trail.scale_amount_max = 1.3
+	shit_trail.color = Color(0.35, 0.22, 0.1)
 	var turd := BoxMesh.new()
 	turd.size = Vector3(0.16, 0.13, 0.16)
 	var tmat := StandardMaterial3D.new()
 	tmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	tmat.albedo_color = Color(0.35, 0.22, 0.1)
 	turd.material = tmat
-	shit_trail.draw_pass_1 = turd
+	shit_trail.mesh = turd
 	shit_trail.visibility_aabb = AABB(Vector3(-8, -2, -8), Vector3(16, 4, 16))
 	add_child(shit_trail)
 	lantern = OmniLight3D.new()
@@ -2731,27 +2725,25 @@ func _build_room_nodes() -> void:
 				exit_light.light_color = Color(0.15, 0.25, 0.4)
 				exit_node.add_child(exit_light)
 				# embers rising off the glowing exit
-				var emb := GPUParticles3D.new()
+				var emb := CPUParticles3D.new()
 				emb.amount = 24
 				emb.lifetime = 1.6
 				emb.preprocess = 1.6
 				emb.local_coords = false
-				var epm := ParticleProcessMaterial.new()
-				epm.direction = Vector3(0, 1, 0)
-				epm.spread = 18.0
-				epm.initial_velocity_min = 1.0
-				epm.initial_velocity_max = 2.5
-				epm.gravity = Vector3(0, 1.0, 0)
-				epm.scale_min = 0.6
-				epm.scale_max = 1.2
-				emb.process_material = epm
+				emb.direction = Vector3(0, 1, 0)
+				emb.spread = 18.0
+				emb.initial_velocity_min = 1.0
+				emb.initial_velocity_max = 2.5
+				emb.gravity = Vector3(0, 1.0, 0)
+				emb.scale_amount_min = 0.6
+				emb.scale_amount_max = 1.2
 				var spark := BoxMesh.new()
 				spark.size = Vector3(0.09, 0.09, 0.09)
 				var smat := StandardMaterial3D.new()
 				smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 				smat.albedo_color = Color(1.0, 0.55, 0.15)
 				spark.material = smat
-				emb.draw_pass_1 = spark
+				emb.mesh = spark
 				emb.visibility_aabb = AABB(Vector3(-3, -1, -3), Vector3(6, 8, 6))
 				emb.position = Vector3(0, 0.3, 0)
 				exit_node.add_child(emb)
