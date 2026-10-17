@@ -89,6 +89,10 @@ const VOICE_TEXT := preload("res://assets/voices/voices_text.gd")
 const JOKER_BG := preload("res://assets/joker.jpg")
 const SFX_SCREAM := preload("res://assets/sfx/death_scream.ogg")
 const SFX_LAUGH := preload("res://assets/sfx/death_laugh.ogg")
+const SFX_CHAIN := preload("res://assets/sfx/chain_rattle.ogg")
+const SEED_CD := 1.2
+const SEED_RANGE := 16.0
+const SEED_SPEED := 12.0
 const MUSIC_STREAM := preload("res://assets/music.mp3")
 const DMG_YELL := preload("res://assets/voices/dmg_yell_01.ogg")
 const FOE_YELL := preload("res://assets/voices/foe_yell_01.ogg")
@@ -165,6 +169,10 @@ var shit_ammo := SHITBOMB_MAX
 var shit_regen_t := 0.0
 var shitbombs: Array = [] # flying turds: {node, vel, t}
 var shitsplats: Array = [] # ground splats: {node, mat, t}
+var chain_player: AudioStreamPlayer
+var seeds: Array = [] # watermelon seeds: {node, vel, t}
+var leash_mat: StandardMaterial3D
+var seed_mat: StandardMaterial3D
 
 var hud_top: Label
 var hud_cap: Label
@@ -831,6 +839,12 @@ func start_run(new_seed: int) -> void:
 		if is_instance_valid(s.get("node") as Node3D):
 			(s.get("node") as Node3D).queue_free()
 	shitsplats.clear()
+	for sd in seeds:
+		if is_instance_valid(sd.get("node") as Node3D):
+			(sd.get("node") as Node3D).queue_free()
+	seeds.clear()
+	if chain_player != null and chain_player.playing:
+		chain_player.stop()
 	if is_instance_valid(ball_knob) and is_instance_valid(ball_base):
 		ball_knob.position = (ball_base.size - ball_knob.size) * 0.5
 	joy_vec = Vector2.ZERO
@@ -1471,9 +1485,81 @@ func _physics_process(delta: float) -> void:
 	_spike_update()
 	_exit_update()
 	_shitbomb_update(delta)
+	_seed_update(delta)
+	_chained_guns(delta)
+	_leash_update()
+	_chain_rattle_update()
 	_lore_sightings()
 	_refresh_hud()
 
+# ---------------- chained spitfires: watermelon seeds at quarter knife ----
+func _seed_update(delta: float) -> void:
+	for i in range(seeds.size() - 1, -1, -1):
+		var s: Dictionary = seeds[i]
+		if not is_instance_valid(s.get("node") as Node3D):
+			seeds.remove_at(i)
+			continue
+		var n: Node3D = s["node"]
+		var v: Vector3 = s["vel"]
+		v.y -= 4.0 * delta
+		n.position += v * delta
+		s["vel"] = v
+		s["t"] = float(s["t"]) + delta
+		var done := n.position.y <= 0.05 or float(s["t"]) > 2.5
+		if not done:
+			for e in enemies:
+				if e["dead"] or e.get("enslaved", false):
+					continue
+				if n.position.distance_to((e["node"] as Node3D).position + Vector3(0, 0.8, 0)) < 0.9:
+					e["hp"] = float(e["hp"]) - float(knife_dmg) * 0.25
+					e["cool"] = 0.35
+					e["flash"] = 0.12
+					play_sfx(SFX_HIT)
+					if e["type"] == "tuhkanaama" and float(e["hp"]) <= 0.0:
+						_enslave(e)
+						continue
+					if float(e["hp"]) <= 0.0:
+						_kill_enemy(e)
+					done = true
+					break
+		if done:
+			n.queue_free()
+			seeds.remove_at(i)
+
+func _chained_guns(delta: float) -> void:
+	if state != "play":
+		return
+	for e in enemies:
+		if not e.get("enslaved", false) or e["dead"]:
+			continue
+		if not is_instance_valid(e.get("node") as Node3D):
+			continue
+		e["seed_cd"] = float(e.get("seed_cd", 0.5)) - delta
+		if float(e["seed_cd"]) > 0.0:
+			continue
+		var from: Vector3 = (e["node"] as Node3D).position + Vector3(0, 1.0, 0)
+		var best: Dictionary = {}
+		var bd := SEED_RANGE
+		for f in enemies:
+			if f["dead"] or f.get("enslaved", false):
+				continue
+			var d: float = from.distance_to((f["node"] as Node3D).position)
+			if d < bd:
+				bd = d
+				best = f
+		e["seed_cd"] = SEED_CD
+		if best.is_empty():
+			continue
+		var target: Vector3 = (best["node"] as Node3D).position + Vector3(0, 0.8, 0)
+		var dir := (target - from).normalized()
+		var n := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.1, 0.1, 0.22)
+		bm.material = seed_mat
+		n.mesh = bm
+		n.position = from
+		(room_node if room_node else self).add_child(n)
+		seeds.append({"node": n, "vel": dir * SEED_SPEED + Vector3(0, 1.0, 0), "t": 0.0})
 # ---------------- shit bomb: arcing turd, radial splash, pooling splats ----
 func _shit_mat() -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -1586,6 +1672,22 @@ func _shitbomb_update(delta: float) -> void:
 			n2.queue_free()
 			shitsplats.remove_at(i)
 
+func _hp_text(e: Dictionary) -> String:
+	# seed chips leave fractional hp: show ints clean, fractions short
+	var h := float(e.get("hp", 0))
+	if absf(h - roundf(h)) < 0.001:
+		return str(int(roundf(h)))
+	return str(snappedf(h, 0.01))
+
+func _chain_rattle_update() -> void:	# the chain sings only while the hero hauls a kneeling pet along
+	if chain_player == null:
+		return
+	var want := state == "play" and not paused_game and hero_moving and _chained_count() > 0
+	if want and not chain_player.playing:
+		chain_player.play()
+	elif not want and chain_player.playing:
+		chain_player.stop()
+
 func _knife_hits() -> void:
 	probe_calls += 1
 	var pp := player_node.position
@@ -1621,12 +1723,51 @@ func _knife_hits() -> void:
 func _enslave(e: Dictionary) -> void:
 	e["enslaved"] = true
 	e["hp"] = 1
+	e["seed_cd"] = 0.5
 	score += 200
 	play_sfx(SFX_DOOR)
 	play_sfx(SFX_CHAINED)
 	_add_collar(e["node"] as Node3D)
+	_add_leash(e)
 	announce("CHAINED! The tuhkanaama kneels. Haul it to the final exit.")
 	say("chain")
+
+func _add_leash(e: Dictionary) -> void:
+	# steel link from the hero femboy to his kneeling pet, restretched every frame
+	if leash_mat == null:
+		return
+	var link := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.07, 0.07, 1.0)
+	bm.material = leash_mat
+	link.mesh = bm
+	(room_node if room_node else self).add_child(link)
+	e["leash"] = link
+
+func _leash_update() -> void:
+	if player_node == null:
+		return
+	var pp := player_node.position + Vector3(0, 1.0, 0)
+	for e in enemies:
+		if not e.get("enslaved", false) or e["dead"]:
+			continue
+		if not is_instance_valid(e.get("node") as Node3D):
+			continue
+		if not is_instance_valid(e.get("leash") as Node3D):
+			_add_leash(e)
+			if not is_instance_valid(e.get("leash") as Node3D):
+				continue
+		var link: Node3D = e["leash"]
+		var fp: Vector3 = (e["node"] as Node3D).position + Vector3(0, 1.0, 0)
+		var d := pp - fp
+		var dist := d.length()
+		if dist < 0.05:
+			link.visible = false
+			continue
+		link.visible = true
+		link.position = (pp + fp) * 0.5
+		link.scale = Vector3(1, 1, dist)
+		link.look_at(pp, Vector3.UP)
 
 func _add_collar(n: Node3D) -> void:
 	var collar := _box(Vector3(0.5, 0.12, 0.5), _tex_mat("collar", COLLAR_TEX, _collar_pal(), 0.6))
@@ -2391,6 +2532,9 @@ func _build_enemy_node(e: Dictionary) -> void:
 	esh.position = Vector3(0, -0.05, 0)
 	if e.get("enslaved", false):
 		_add_collar(n) # chains travel between rooms
+		_add_leash(e)
+		if not e.has("seed_cd"):
+			e["seed_cd"] = 0.5
 	n.position = Vector3(p.x * CELL, 0.1, p.y * CELL)
 	(room_node if room_node else self).add_child(n)
 	e["node"] = n
@@ -2747,7 +2891,7 @@ func _refresh_hud() -> void:
 	hud_combo.text = ("COMBO x%d" % combo) if combo > 1 else ""
 	var _foe := _bot_nearest_foe()
 	if not _foe.is_empty():
-		var _fl := "FOE %s %s/%s" % [str(_foe.get("type", "?")), str(_foe.get("hp", "?")), str(_foe.get("maxhp", "?"))]
+		var _fl := "FOE %s %s/%s" % [str(_foe.get("type", "?")), _hp_text(_foe), str(_foe.get("maxhp", "?"))]
 		hud_combo.text = (hud_combo.text + "\n" + _fl) if hud_combo.text != "" else _fl
 	hud_inv.text = _inv_text()
 	if is_instance_valid(joy_knob):
@@ -2848,6 +2992,22 @@ func _build_audio() -> void:
 	foe_yell_player.stream = FOE_YELL
 	foe_yell_player.volume_db = -4.0
 	add_child(foe_yell_player)
+	# chain rattle: looped while the hero drags a chained foe along
+	chain_player = AudioStreamPlayer.new()
+	var chain: AudioStream = SFX_CHAIN
+	if chain is AudioStreamOggVorbis:
+		(chain as AudioStreamOggVorbis).loop = true
+	chain_player.stream = chain
+	chain_player.volume_db = -12.0
+	add_child(chain_player)
+	leash_mat = StandardMaterial3D.new()
+	leash_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	leash_mat.albedo_color = Color(0.55, 0.56, 0.6)
+	leash_mat.metallic = 0.7
+	leash_mat.roughness = 0.35
+	seed_mat = StandardMaterial3D.new()
+	seed_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	seed_mat.albedo_color = Color(0.08, 0.25, 0.08)
 
 func music_play() -> void:
 	if music_player != null and not music_player.playing:
