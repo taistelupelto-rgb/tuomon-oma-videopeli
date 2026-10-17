@@ -118,10 +118,69 @@ void fragment() {
 	SPECULAR = 0.7;
 }
 """
+const SKY_SHADER := """shader_type sky;
+void sky() {
+	float h = clamp(EYEDIR.y, -1.0, 1.0);
+	vec3 col = mix(vec3(0.10, 0.07, 0.06), vec3(0.005, 0.008, 0.03), smoothstep(-0.1, 0.6, h));
+	vec2 sp = EYEDIR.xz / max(0.15, EYEDIR.y + 0.4);
+	vec2 cell = floor(sp * 90.0);
+	float star = step(0.992, fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.55));
+	float tw = 0.5 + 0.5 * sin(TIME * (2.0 + fract(cell.x * 0.37) * 4.0) + cell.y);
+	col += vec3(0.9, 0.95, 1.0) * star * tw * smoothstep(0.05, 0.4, h);
+	vec3 md = normalize(vec3(-0.45, 0.55, -0.6));
+	float m = dot(EYEDIR, md);
+	col += vec3(0.95, 0.93, 0.8) * smoothstep(0.9992, 0.9997, m);
+	col += vec3(0.4, 0.42, 0.35) * pow(max(m, 0.0), 60.0) * 0.4;
+	float band = sin(EYEDIR.x * 4.0 + TIME * 0.35 + sin(EYEDIR.z * 3.0 + TIME * 0.22) * 1.5);
+	float curt = smoothstep(0.1, 0.55, h) * smoothstep(0.95, 0.45, h);
+	float rays = 0.6 + 0.4 * sin(EYEDIR.x * 40.0 + EYEDIR.z * 25.0 + TIME * 0.8);
+	float a = curt * (0.5 + 0.5 * band) * rays;
+	col += vec3(0.1, 0.9, 0.45) * a * 0.55;
+	col += vec3(0.45, 0.2, 0.8) * a * a * 0.5;
+	COLOR = col;
+}
+"""
+const FLAME_SHADER := """shader_type spatial;
+render_mode unshaded, cull_disabled, fog_disabled;
+uniform vec4 hot : source_color = vec4(1.0, 0.85, 0.3, 1.0);
+uniform vec4 mid : source_color = vec4(1.0, 0.4, 0.1, 1.0);
+void vertex() {
+	float sway = VERTEX.y + 0.35;
+	VERTEX.x += sin(VERTEX.y * 9.0 + TIME * 13.0) * 0.10 * sway;
+	VERTEX.z += cos(VERTEX.y * 7.0 + TIME * 11.0) * 0.10 * sway;
+}
+void fragment() {
+	float h = clamp(UV.y, 0.0, 1.0);
+	vec3 col = mix(mid.rgb, hot.rgb, h * h);
+	float flick = 0.85 + 0.15 * sin(TIME * 23.0 + UV.y * 20.0);
+	ALBEDO = col * flick;
+}
+"""
+const BEAM_SHADER := """shader_type spatial;
+render_mode blend_mix, cull_disabled, depth_draw_never, unshaded, fog_disabled;
+uniform vec4 glow : source_color = vec4(0.3, 1.0, 0.5, 1.0);
+void fragment() {
+	float flow = fract(UV.y * 2.0 - TIME * 0.7);
+	float bands = smoothstep(0.0, 0.35, flow) * smoothstep(1.0, 0.55, flow);
+	float edge = smoothstep(0.0, 0.25, UV.x) * smoothstep(1.0, 0.75, UV.x);
+	ALBEDO = glow.rgb;
+	ALPHA = (0.12 + bands * 0.35) * edge;
+}
+"""
+const PLASMA_SHADER := """shader_type canvas_item;
+void fragment() {
+	vec2 p = UV * 6.0;
+	float v = sin(p.x + TIME * 0.7) + sin(p.y * 1.3 - TIME * 0.9) + sin((p.x + p.y) * 0.8 + TIME * 0.5) + sin(length(p - 3.0) * 1.5 - TIME * 1.1);
+	v *= 0.25;
+	vec3 col = 0.5 + 0.5 * cos(TIME * 0.4 + vec3(v * 6.28, v * 6.28 + 2.1, v * 6.28 + 4.2));
+	COLOR = vec4(col * 0.55, 1.0);
+}
+"""
 const JOKER_BG := preload("res://assets/joker.jpg")
 const SFX_SCREAM := preload("res://assets/sfx/death_scream.ogg")
 const SFX_LAUGH := preload("res://assets/sfx/death_laugh.ogg")
 const SFX_CHAIN := preload("res://assets/sfx/chain_rattle.ogg")
+const SFX_THUNDER := preload("res://assets/sfx/thunder.ogg")
 const SFX_PLOP := preload("res://assets/sfx/seed_plop.ogg")
 const SEED_CD := 2.0
 const SEED_RANGE := 16.0
@@ -200,6 +259,13 @@ var dust: GPUParticles3D
 var kill_flash := 0.0
 var kill_rect: ColorRect
 var hitstop_n := 0
+var cave_env: Environment
+var bolt_t := 12.0
+var shake := 0.0
+var rings: Array = []
+var plasma: ColorRect
+var last_combo := 0
+var combo_pop := 0.0
 var shit_trail: GPUParticles3D
 var hero_moving := false
 var shit_ammo := SHITBOMB_MAX
@@ -1377,6 +1443,26 @@ func _process(delta: float) -> void:
 		kill_rect.color = Color(1, 0.95, 0.8, 0.4 * clampf(kill_flash, 0.0, 1.0))
 	if is_instance_valid(hero_sprite):
 		hero_sprite.modulate = Color(1, 1, 1).lerp(Color(1.4, 1.1, 0.55), clampf(float(combo) / 12.0, 0.0, 1.0))
+	if combo != last_combo:
+		if combo > last_combo:
+			combo_pop = 1.0
+		last_combo = combo
+	if combo_pop > 0.0:
+		combo_pop = maxf(0.0, combo_pop - delta * 4.0)
+	if is_instance_valid(hud_combo):
+		var cs := 1.0 + 0.45 * combo_pop
+		hud_combo.scale = Vector2(cs, cs)
+	_ring_update(delta)
+	# cave lightning: white sky-split, rumble follows
+	bolt_t -= delta
+	if bolt_t <= 0.0:
+		bolt_t = randf_range(9.0, 20.0)
+		if cave_env != null:
+			cave_env.ambient_light_energy = 2.6
+		kill_flash = maxf(kill_flash, 0.7)
+		play_sfx(SFX_THUNDER)
+	if cave_env != null and cave_env.ambient_light_energy > 0.85:
+		cave_env.ambient_light_energy = lerpf(cave_env.ambient_light_energy, 0.85, 1.0 - exp(-5.0 * delta))
 	if tick % 60 == 0:
 		var s := get_viewport().get_visible_rect().size
 		cam.fov = 88.0 if s.y > s.x else 70.0
@@ -1482,6 +1568,11 @@ func _physics_process(delta: float) -> void:
 		cam_yaw = yaw
 	cam_rig.rotation.y = cam_yaw
 	spring.rotation.x = cam_pitch
+	if shake > 0.003:
+		shake = lerpf(shake, 0.0, 1.0 - exp(-6.0 * delta))
+		cam.position = Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), 0.0) * shake * 0.35
+	elif is_instance_valid(cam) and cam.position != Vector3.ZERO:
+		cam.position = Vector3.ZERO
 	rain.position = Vector3(player_node.position.x, 6.0, player_node.position.z)
 	if is_instance_valid(dust):
 		dust.position = player_node.position + Vector3(0, 2.0, 0)
@@ -1661,6 +1752,8 @@ func _explode_shitbomb(p: Vector3) -> void:
 	_poof(p + Vector3(0, 0.4, 0), Color(0.4, 0.26, 0.12))
 	_poof(p + Vector3(0, 0.2, 0), Color(0.25, 0.15, 0.07))
 	play_sfx(SFX_HIT2, p)
+	spawn_ring(p, Color(0.45, 0.3, 0.12))
+	add_shake(0.5)
 	var hit_any := false
 	for e in enemies:
 		if e["dead"] or e.get("enslaved", false):
@@ -1857,6 +1950,35 @@ func _chained_near(pos: Vector3, r: float) -> bool:
 				return true
 	return false
 
+func spawn_ring(p: Vector3, col: Color) -> void:
+	for r in rings:
+		if float(r["t"]) >= 1.0 and is_instance_valid(r["node"] as Node3D):
+			r["t"] = 0.0
+			var n: Node3D = r["node"]
+			n.position = Vector3(p.x, 0.25, p.z)
+			n.visible = true
+			(r["mat"] as StandardMaterial3D).albedo_color = Color(col.r, col.g, col.b, 0.9)
+			return
+
+func add_shake(amount: float) -> void:
+	shake = minf(1.2, shake + amount)
+
+func _ring_update(delta: float) -> void:
+	for r in rings:
+		if float(r["t"]) >= 1.0:
+			continue
+		r["t"] = float(r["t"]) + delta * 2.2
+		var t := float(r["t"])
+		if t >= 1.0:
+			(r["node"] as Node3D).visible = false
+			continue
+		var n: Node3D = r["node"]
+		var s := 0.5 + t * 6.5
+		n.scale = Vector3(s, s, s)
+		var c: Color = (r["mat"] as StandardMaterial3D).albedo_color
+		c.a = 0.9 * (1.0 - t)
+		(r["mat"] as StandardMaterial3D).albedo_color = c
+
 func _hitstop() -> void:
 	# demo-scene impact freeze: 70ms of near-stillness on every kill, free juice
 	hitstop_n += 1
@@ -1881,6 +2003,8 @@ func _kill_enemy(e: Dictionary) -> void:
 		gain = 500
 	score += gain + combo * 5
 	play_sfx(SFX_HIT2, (e["node"] as Node3D).position)
+	spawn_ring((e["node"] as Node3D).position, Color(1.0, 0.84, 0.0) if e["boss"] else Color(1.0, 0.5, 0.2))
+	add_shake(1.0 if e["boss"] else 0.3)
 	(e["node"] as Node3D).visible = false
 	_poof((e["node"] as Node3D).position + Vector3(0, 0.8, 0), Color(1.0, 0.84, 0.0) if e["boss"] else Color(1.0, 0.35, 0.3))
 	if e["boss"]:
@@ -2209,6 +2333,7 @@ func hurt(src: String) -> void:
 	combo = 0
 	play_sfx(SFX_HURT)
 	damage_yell()
+	add_shake(0.6)
 	if hp <= 0:
 		say("die")
 		state = "dead"
@@ -2300,18 +2425,18 @@ func _build_environment() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
-	var sm := ProceduralSkyMaterial.new()
-	sm.sky_top_color = Color(0.02, 0.02, 0.07)
-	sm.sky_horizon_color = Color(0.25, 0.2, 0.15)
-	sm.ground_bottom_color = Color(0.01, 0.01, 0.02)
-	sm.ground_horizon_color = Color(0.12, 0.09, 0.07)
-	sky.sky_material = sm
+	var skysh := Shader.new()
+	skysh.code = SKY_SHADER
+	var skym := ShaderMaterial.new()
+	skym.shader = skysh
+	sky.sky_material = skym
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = 0.85
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.04, 0.04, 0.08)
 	env.fog_density = 0.03
+	cave_env = env
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -2566,6 +2691,21 @@ func _build_room_nodes() -> void:
 				emb.visibility_aabb = AABB(Vector3(-3, -1, -3), Vector3(6, 8, 6))
 				emb.position = Vector3(0, 0.3, 0)
 				exit_node.add_child(emb)
+				# light beam shooting skyward off the exit
+				var beam := MeshInstance3D.new()
+				var cyl := CylinderMesh.new()
+				cyl.top_radius = 0.5
+				cyl.bottom_radius = 0.7
+				cyl.height = 9.0
+				var bsh := Shader.new()
+				bsh.code = BEAM_SHADER
+				var bmat := ShaderMaterial.new()
+				bmat.shader = bsh
+				cyl.material = bmat
+				beam.mesh = cyl
+				beam.position = Vector3(0, 4.5, 0)
+				beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				exit_node.add_child(beam)
 				room_node.add_child(exit_node)
 	var torch_spots: Array = []
 	for base in [SPAWN_CELL, exit_cell]:
@@ -2597,6 +2737,21 @@ func _build_room_nodes() -> void:
 		torch.add_to_group("torch")
 		room_node.add_child(torch)
 		torches.append(torch)
+		# living flame cone over every torch
+		var flame := MeshInstance3D.new()
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.03
+		cone.bottom_radius = 0.22
+		cone.height = 0.7
+		var fsh := Shader.new()
+		fsh.code = FLAME_SHADER
+		var fmat := ShaderMaterial.new()
+		fmat.shader = fsh
+		cone.material = fmat
+		flame.mesh = cone
+		flame.position = Vector3(tp.x * CELL, 2.1, tp.y * CELL)
+		flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		room_node.add_child(flame)
 	# pickups + enemies
 	for it in items:
 		var p: Vector2i = it["cell"]
@@ -2683,6 +2838,35 @@ func _place_player_spawn() -> void:
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
+	# plasma demo backdrop, title screen only
+	var plsh := Shader.new()
+	plsh.code = PLASMA_SHADER
+	plasma = ColorRect.new()
+	plasma.name = "PlasmaTitle"
+	plasma.set_anchors_preset(Control.PRESET_FULL_RECT)
+	plasma.color = Color(1, 1, 1, 1)
+	plasma.material = ShaderMaterial.new()
+	(plasma.material as ShaderMaterial).shader = plsh
+	plasma.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plasma.visible = false
+	layer.add_child(plasma)
+	# shockwave ring pool: flat gold hoops that blast outward on kills
+	for i in 4:
+		var ring := MeshInstance3D.new()
+		var tor := TorusMesh.new()
+		tor.inner_radius = 0.92
+		tor.outer_radius = 1.0
+		var rmat := StandardMaterial3D.new()
+		rmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		rmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		rmat.albedo_color = Color(1.0, 0.85, 0.4, 0.0)
+		tor.material = rmat
+		ring.mesh = tor
+		ring.rotation.x = PI / 2.0
+		ring.visible = false
+		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(ring)
+		rings.append({"node": ring, "mat": rmat, "t": 1.0})
 	hud_top = Label.new()
 	hud_top.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	hud_top.offset_left = 12
@@ -2705,6 +2889,7 @@ func _build_hud() -> void:
 	hud_combo.offset_right = -12
 	hud_combo.add_theme_font_size_override("font_size", 16)
 	hud_combo.add_theme_color_override("font_color", Color(1, 0.6, 0.2))
+	hud_combo.pivot_offset = Vector2(200, 20)
 	layer.add_child(hud_combo)
 	hud_cap = Label.new()
 	hud_cap.set_anchors_preset(Control.PRESET_TOP_WIDE)
@@ -3145,6 +3330,8 @@ func _refresh_hud() -> void:
 
 func _refresh_overlays() -> void:
 	title_panel.visible = state == "title"
+	if is_instance_valid(plasma):
+		plasma.visible = state == "title"
 	dead_panel.visible = state == "dead"
 	if is_instance_valid(dead_bg):
 		dead_bg.visible = state == "dead"
