@@ -858,19 +858,20 @@ func _add_halo(parent: Node3D, color: Color, size: float, y: float) -> Sprite3D:
 	s.pixel_size = size / 32.0
 	s.position = Vector3(0, y, 0)
 	s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	s.render_priority = -1
 	parent.add_child(s)
 	return s
 
 func _halo_color(kind: String) -> Color:
 	if kind == "heart":
-		return Color(1.0, 0.25, 0.35, 0.55)
+		return Color(1.0, 0.25, 0.35, 0.45)
 	if kind == "melon":
-		return Color(0.85, 1.0, 0.3, 0.55)
+		return Color(0.85, 1.0, 0.3, 0.45)
 	if kind == "sharp":
-		return Color(1.0, 0.8, 0.25, 0.6)
+		return Color(1.0, 0.8, 0.25, 0.45)
 	if kind == "boots":
-		return Color(1.0, 0.55, 0.2, 0.55)
-	return Color(0.3, 1.0, 0.45, 0.55) # crys + default green
+		return Color(1.0, 0.55, 0.2, 0.45)
+	return Color(0.3, 1.0, 0.45, 0.45) # crys + default green
 
 func _get_shadow_tex() -> Texture2D:
 	if shadow_tex != null:
@@ -2818,7 +2819,7 @@ func _build_room_nodes() -> void:
 	for it in items:
 		var p: Vector2i = it["cell"]
 		var cpair: Array = _item_tex("crys")
-		var cnode := _sprite3d(_cached_tex("item_crys", cpair[0], cpair[1]), 0.07, 0.9)
+		var cnode := _sprite3d(_cached_tex("item_crys", cpair[0], cpair[1]), 0.09, 0.9)
 		cnode.position = Vector3(p.x * CELL, 0.9, p.y * CELL)
 		room_node.add_child(cnode)
 		_add_halo(cnode, _halo_color("crys"), 1.8, 0.0)
@@ -2830,7 +2831,7 @@ func _build_room_nodes() -> void:
 	for ex in extras:
 		var p: Vector2i = ex["cell"]
 		var xpair: Array = _item_tex(String(ex["kind"]))
-		var node := _sprite3d(_cached_tex("item_" + String(ex["kind"]), xpair[0], xpair[1]), 0.07, 0.9)
+		var node := _sprite3d(_cached_tex("item_" + String(ex["kind"]), xpair[0], xpair[1]), 0.09, 0.9)
 		node.position = Vector3(p.x * CELL, 0.9, p.y * CELL)
 		room_node.add_child(node)
 		_add_halo(node, _halo_color(String(ex["kind"])), 1.8, 0.0)
