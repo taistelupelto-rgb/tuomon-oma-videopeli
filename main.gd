@@ -86,6 +86,9 @@ const SFX_DEATH := preload("res://assets/sfx/game_over.ogg")
 const SFX_CHAINED := preload("res://assets/sfx/chained.ogg")
 const SFX_WARDEN := preload("res://assets/sfx/warden_down.ogg")
 const VOICE_TEXT := preload("res://assets/voices/voices_text.gd")
+const JOKER_BG := preload("res://assets/joker.jpg")
+const SFX_SCREAM := preload("res://assets/sfx/death_scream.ogg")
+const SFX_LAUGH := preload("res://assets/sfx/death_laugh.ogg")
 const MUSIC_STREAM := preload("res://assets/music.mp3")
 const DMG_YELL := preload("res://assets/voices/dmg_yell_01.ogg")
 const FOE_YELL := preload("res://assets/voices/foe_yell_01.ogg")
@@ -175,6 +178,10 @@ var exit_nag_t := 0.0
 var title_panel: PanelContainer
 var ski_btn: Button
 var dead_panel: PanelContainer
+var dead_bg: TextureRect
+var death_scream_player: AudioStreamPlayer
+var death_laugh_player: AudioStreamPlayer
+var death_laugh_t := -1.0
 var win_panel: PanelContainer
 var codex_panel: PanelContainer
 var seen := {}
@@ -815,6 +822,7 @@ func start_run(new_seed: int) -> void:
 	look_sm = Vector2.ZERO
 	shit_ammo = SHITBOMB_MAX
 	shit_regen_t = 0.0
+	death_laugh_t = -1.0
 	for b in shitbombs:
 		if is_instance_valid(b.get("node") as Node3D):
 			(b.get("node") as Node3D).queue_free()
@@ -1296,8 +1304,11 @@ func _process(delta: float) -> void:
 		cam.fov = 88.0 if s.y > s.x else 70.0
 	if cap_t > 0.0:
 		cap_t -= delta
-		if cap_t <= 0.0:
-			hud_cap.text = ""
+		if cap_t <= 0.0:			hud_cap.text = ""
+	if death_laugh_t >= 0.0:
+		death_laugh_t -= delta
+		if death_laugh_t < 0.0 and state == "dead" and death_laugh_player != null:
+			death_laugh_player.play()
 	if tick % 1800 == 0:
 		say("idle")
 	if autoplay:
@@ -1980,6 +1991,9 @@ func hurt(src: String) -> void:
 		say("die")
 		state = "dead"
 		play_sfx(SFX_DEATH)
+		if death_scream_player != null:
+			death_scream_player.play()
+		death_laugh_t = 1.1 # the Joker starts laughing right after the scream
 		if score > best_score: best_score = score; _hs_save()
 		_refresh_overlays()
 		return
@@ -2475,6 +2489,22 @@ func _build_hud() -> void:
 	ski_btn.pressed.connect(_on_ski_button)
 	title_vb.add_child(ski_btn)
 	dead_panel = _overlay(layer, "YOU DIED", "The cave keeps the knife.\nTap or ENTER for a new cave.")
+	# Joker laughs at your death: full-screen meme behind the panel
+	dead_bg = TextureRect.new()
+	dead_bg.texture = JOKER_BG
+	dead_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dead_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	dead_bg.visible = false
+	layer.add_child(dead_bg)
+	layer.move_child(dead_bg, 0)
+	death_scream_player = AudioStreamPlayer.new()
+	death_scream_player.stream = SFX_SCREAM
+	death_scream_player.volume_db = -4.0
+	add_child(death_scream_player)
+	death_laugh_player = AudioStreamPlayer.new()
+	death_laugh_player.stream = SFX_LAUGH
+	death_laugh_player.volume_db = -4.0
+	add_child(death_laugh_player)
 	win_panel = _overlay(layer, "ENSLAVED AND DELIVERED!", "A chained tuhkanaama kneels at the glowing exit. The cave releases its master.\n\n" + LORE_OUTRO + "\nTap or ENTER for a new cave.")
 	codex_panel = _overlay(layer, "THE CAVE REMEMBERS", _codex_text(), "CLOSE")
 	pause_label = Label.new()
@@ -2727,6 +2757,8 @@ func _refresh_hud() -> void:
 func _refresh_overlays() -> void:
 	title_panel.visible = state == "title"
 	dead_panel.visible = state == "dead"
+	if is_instance_valid(dead_bg):
+		dead_bg.visible = state == "dead"
 	win_panel.visible = state == "win"
 	if state != "play":
 		codex_panel.visible = false
