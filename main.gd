@@ -200,7 +200,7 @@ var sfx_players: Array = []
 var sfx_i := 0
 var music_player: AudioStreamPlayer
 var dmg_yell_player: AudioStreamPlayer
-var foe_yell_player: AudioStreamPlayer
+var foe_yell_player: AudioStreamPlayer3D
 var autoplay := false
 var auto_t := 0
 var inventory: Array = [] # slots: {kind, count}. persists rooms, dies on new run.
@@ -262,7 +262,7 @@ func _build_voice_bank() -> void:
 			arr.append("%s_%02d.ogg" % [cat, i])
 		voice_bank[cat] = arr
 
-func say(cat: String) -> void:
+func say(cat: String, pos: Vector3 = Vector3.INF) -> void:
 	if state != "play" or voice_cd > 0.0:
 		return
 	if not voice_bank.has(cat) or (voice_bank[cat] as Array).is_empty():
@@ -278,7 +278,7 @@ func say(cat: String) -> void:
 			return
 		voice_cache[f] = stream
 	voice_cd = 5.0
-	play_sfx(stream)
+	play_sfx(stream, pos)
 	var sub: String = VOICE_TEXT.LINES.get(f, "")
 	if sub != "" and cap_t <= 1.0:
 		announce(sub)
@@ -1515,7 +1515,8 @@ func _seed_update(delta: float) -> void:
 					e["hp"] = float(e["hp"]) - float(knife_dmg) * 0.25
 					e["cool"] = 0.35
 					e["flash"] = 0.12
-					play_sfx(SFX_HIT)
+					play_sfx(SFX_HIT, (e["node"] as Node3D).position)
+					foe_yell((e["node"] as Node3D).position)
 					if e["type"] == "tuhkanaama" and float(e["hp"]) <= 0.0:
 						_enslave(e)
 						continue
@@ -1561,7 +1562,7 @@ func _chained_guns(delta: float) -> void:
 		n.position = from
 		(room_node if room_node else self).add_child(n)
 		seeds.append({"node": n, "vel": dir * SEED_SPEED + Vector3(0, 1.0, 0), "t": 0.0})
-		play_sfx(SFX_PLOP) # plop!
+		play_sfx(SFX_PLOP, from) # plop!
 # ---------------- shit bomb: arcing turd, radial splash, pooling splats ----
 func _shit_mat() -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -1594,6 +1595,7 @@ func _explode_shitbomb(p: Vector3) -> void:
 	# splash: brown burst with gravity + drag reads as fluid spray
 	_poof(p + Vector3(0, 0.4, 0), Color(0.4, 0.26, 0.12))
 	_poof(p + Vector3(0, 0.2, 0), Color(0.25, 0.15, 0.07))
+	play_sfx(SFX_HIT2, p)
 	var hit_any := false
 	for e in enemies:
 		if e["dead"] or e.get("enslaved", false):
@@ -1611,7 +1613,7 @@ func _explode_shitbomb(p: Vector3) -> void:
 		if int(e["hp"]) <= 0:
 			_kill_enemy(e)
 	if hit_any:
-		foe_yell()
+		foe_yell(p)
 	# pooling splat: spreads fast, then dries out and frees itself
 	var splat := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
@@ -1712,13 +1714,13 @@ func _knife_hits() -> void:
 		e["flash"] = 0.12
 		combo += 1
 		combo_t = 3.0
-		play_sfx(SFX_HIT)
-		foe_yell()
+		play_sfx(SFX_HIT, ep)
+		foe_yell(ep)
 		if e["type"] == "tuhkanaama" and int(e["hp"]) <= 0:
 			_enslave(e) # the soot-face cannot die. It kneels.
 			continue
 		if combo == 5:
-			say("combo")
+			say("combo", ep)
 		if int(e["hp"]) <= 0:
 			_kill_enemy(e)
 
@@ -1727,12 +1729,12 @@ func _enslave(e: Dictionary) -> void:
 	e["hp"] = 1
 	e["seed_cd"] = 0.5
 	score += 200
-	play_sfx(SFX_DOOR)
-	play_sfx(SFX_CHAINED)
+	play_sfx(SFX_DOOR, (e["node"] as Node3D).position)
+	play_sfx(SFX_CHAINED, (e["node"] as Node3D).position)
 	_add_collar(e["node"] as Node3D)
 	_add_leash(e)
 	announce("CHAINED! The tuhkanaama kneels. Haul it to the final exit.")
-	say("chain")
+	say("chain", (e["node"] as Node3D).position)
 
 func _add_leash(e: Dictionary) -> void:
 	# steel link from the hero femboy to his kneeling pet, restretched every frame
@@ -1801,15 +1803,15 @@ func _kill_enemy(e: Dictionary) -> void:
 	if e["boss"]:
 		gain = 500
 	score += gain + combo * 5
-	play_sfx(SFX_HIT2)
+	play_sfx(SFX_HIT2, (e["node"] as Node3D).position)
 	(e["node"] as Node3D).visible = false
 	_poof((e["node"] as Node3D).position + Vector3(0, 0.8, 0), Color(1.0, 0.84, 0.0) if e["boss"] else Color(1.0, 0.35, 0.3))
 	if e["boss"]:
 		announce("WARDEN DOWN! Reach the glowing exit.")
-		play_sfx(SFX_WARDEN)
-		say("boss_die")
+		play_sfx(SFX_WARDEN, (e["node"] as Node3D).position)
+		say("boss_die", (e["node"] as Node3D).position)
 	else:
-		say("kill")
+		say("kill", (e["node"] as Node3D).position)
 
 func _enemy_update(delta: float) -> void:
 	var pp := player_node.position
@@ -1907,7 +1909,7 @@ func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, de
 				alive += 1
 		if alive < 6:
 			_spawn_minion(n.position)
-			say("boss_taunt")
+			say("boss_taunt", n.position)
 
 func _nearest_melon(from: Vector3) -> Dictionary:
 	var best := {}
@@ -1937,7 +1939,7 @@ func _tuhkanaama_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: flo
 		e["sp"] = float(e["sp"]) + 0.4
 		n.scale *= 1.08
 		announce("Tuhkanaama devours a sun-melon. Its teeth glow brighter.")
-		play_sfx(SFX_COIN)
+		play_sfx(SFX_COIN, (meal["node"] as Node3D).position)
 		n.velocity.x = 0.0
 		n.velocity.z = 0.0
 	else:
@@ -2038,9 +2040,9 @@ func _pickup_update() -> void:
 			it["taken"] = true
 			(it["node"] as Node3D).visible = false
 			score += 100
-			play_sfx(SFX_COIN)
+			play_sfx(SFX_COIN, (it["node"] as Node3D).position)
 			announce("Crystal packed (%d left out there)." % _crystals_left())
-			say("pk_crys")
+			say("pk_crys", (it["node"] as Node3D).position)
 	for ex in extras:
 		if ex["taken"]:
 			continue
@@ -2074,14 +2076,14 @@ func _pickup_update() -> void:
 				ex["taken"] = true
 				(ex["node"] as Node3D).visible = false
 				announce("Sharp knife: double damage.")
-				say("pk_sharp")
+				say("pk_sharp", (ex["node"] as Node3D).position)
 			else:
 				speed_bonus += 1.0
 				ex["taken"] = true
 				(ex["node"] as Node3D).visible = false
 				announce("Boots: faster.")
-				say("pk_boots")
-			play_sfx(SFX_COIN)
+				say("pk_boots", (ex["node"] as Node3D).position)
+			play_sfx(SFX_COIN, (ex["node"] as Node3D).position)
 
 func _crystals_left() -> int:
 	var n := 0
@@ -2103,14 +2105,14 @@ func _exit_update() -> void:
 	(exit_node.get_child(0) as MeshInstance3D).visible = true
 	if open and player_node.position.distance_to(exit_node.position) < 2.0:
 		if ri < ROOM_DEFS.size() - 1:
-			play_sfx(SFX_DOOR)
+			play_sfx(SFX_DOOR, exit_node.position)
 			score += 250
 			if exit_voiced != ri:
 				exit_voiced = ri
 				say("exit_open")
 			_load_room(ri + 1)
 		elif _chained_near(exit_node.position, 8.0):
-			play_sfx(SFX_DOOR)
+			play_sfx(SFX_DOOR, exit_node.position)
 			_win()
 		elif open:
 			if exit_nag_t <= 0.0:
@@ -2939,13 +2941,13 @@ func _lore_sightings() -> void:
 			seen[key] = true
 			announce(String(LORE_ENEMIES[e["type"]]))
 			if e["type"] == "chase":
-				say("foe_chase")
+				say("foe_chase", ep)
 			elif e["type"] == "dash":
-				say("foe_dash")
+				say("foe_dash", ep)
 			elif e["type"] == "tuhkanaama":
-				say("foe_tuhk")
+				say("foe_tuhk", ep)
 			elif e["type"] == "boss":
-				say("boss_see")
+				say("boss_see", ep)
 			return
 	for ex in extras:
 		if ex["taken"] or ex["kind"] != "melon":
@@ -2971,9 +2973,18 @@ func announce(text: String) -> void:
 
 func _build_audio() -> void:
 	for i in 8:
-		var p := AudioStreamPlayer.new()
+		var p := AudioStreamPlayer3D.new()
+		p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_SQUARE_DISTANCE
+		p.unit_size = 3.5
+		p.max_distance = 60.0
 		add_child(p)
 		sfx_players.append(p)
+	# the cave itself: a breath of reverb on everything
+	var rev := AudioEffectReverb.new()
+	rev.room_size = 0.85
+	rev.wet = 0.22
+	rev.predelay_msec = 25.0
+	AudioServer.add_bus_effect(0, rev)
 	# the Indian-song track loops for the whole run
 	music_player = AudioStreamPlayer.new()
 	var music: AudioStream = MUSIC_STREAM
@@ -2989,8 +3000,11 @@ func _build_audio() -> void:
 	dmg_yell_player.stream = DMG_YELL
 	dmg_yell_player.volume_db = -4.0
 	add_child(dmg_yell_player)
-	# the foe's cry when knifed: same treatment, every landed hit
-	foe_yell_player = AudioStreamPlayer.new()
+	# the foe's cry when knifed: positional, every landed hit
+	foe_yell_player = AudioStreamPlayer3D.new()
+	foe_yell_player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_SQUARE_DISTANCE
+	foe_yell_player.unit_size = 3.5
+	foe_yell_player.max_distance = 60.0
 	foe_yell_player.stream = FOE_YELL
 	foe_yell_player.volume_db = -4.0
 	add_child(foe_yell_player)
@@ -3024,16 +3038,22 @@ func damage_yell() -> void:
 		return
 	dmg_yell_player.play()
 
-func foe_yell() -> void:
+func foe_yell(pos: Vector3 = Vector3.INF) -> void:
 	if state != "play" or foe_yell_player == null:
 		return
+	if pos == Vector3.INF:
+		pos = player_node.position if is_instance_valid(player_node) else Vector3.ZERO
+	foe_yell_player.position = pos
 	foe_yell_player.play()
 
-func play_sfx(stream: AudioStream) -> void:
-	var p: AudioStreamPlayer = sfx_players[sfx_i]
+func play_sfx(stream: AudioStream, pos: Vector3 = Vector3.INF) -> void:
+	var p: AudioStreamPlayer3D = sfx_players[sfx_i]
 	sfx_i = (sfx_i + 1) % sfx_players.size()
 	p.stream = stream
 	p.volume_db = -6.0
+	if pos == Vector3.INF:
+		pos = player_node.position if is_instance_valid(player_node) else Vector3.ZERO
+	p.position = pos
 	p.play()
 
 # ---------------- autoplay smoke hook ----------------
