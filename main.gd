@@ -13,6 +13,10 @@ var exit_cell: Vector2i = Vector2i(18, 6)
 const SPAWN_CELL := Vector2i(1, 6)
 const WALK_SPEED := 5.2
 const TURN_SPEED := 3.4
+const LOOK_YAW := 3.8 # right-stick max yaw rate, rad/s
+const LOOK_PITCH := 2.6 # right-stick max pitch rate, rad/s
+const LOOK_EXPO := 1.35 # stick curve: fine aim center, fast edges
+const LOOK_DEAD := 0.12 # stick deadzone
 const KNIFE_RANGE := 3.0
 const KNIFE_ARC := 1.0 # radians, half-angle
 const CAM_PITCH_MIN := -0.35
@@ -191,9 +195,12 @@ var joy_base: Panel
 var joy_knob: Panel
 var ball_id := -1
 var ball_origin := Vector2.ZERO
+var look_vec := Vector2.ZERO # right-stick deflection, -1..1 (x yaw, y pitch)
+var look_sm := Vector2.ZERO # smoothed copy, applied as camera rate
 var ball_base: Panel
 var ball_knob: Panel
 var touch_layer: CanvasLayer
+var look_block: Array = [] # right-side controls the camera stick must not steal
 var has_touch := false
 var jump_node: Node2D
 
@@ -795,6 +802,8 @@ func start_run(new_seed: int) -> void:
 	joy_id = -1
 	look_id = -1
 	ball_id = -1
+	look_vec = Vector2.ZERO
+	look_sm = Vector2.ZERO
 	if is_instance_valid(ball_knob) and is_instance_valid(ball_base):
 		ball_knob.position = (ball_base.size - ball_knob.size) * 0.5
 	joy_vec = Vector2.ZERO
@@ -1129,13 +1138,26 @@ func _input(event: InputEvent) -> void:
 				_refresh_overlays()
 				return
 			var pos: Vector2 = event.position
-			if state == "play" and not paused_game and ball_id == -1 and _ball_rect().has_point(pos):
+			# Right-side HUD buttons keep their own touches; everything else
+			# on the right half is camera stick.
+			var on_buttons := false
+			for b in look_block:
+				if is_instance_valid(b) and (b as Control).get_global_rect().grow(8.0).has_point(pos):
+					on_buttons = true
+					break
+			# right stick: floating origin anywhere on the right half,
+			# deflection drives camera rate (dualsense-style)
+			if state == "play" and not paused_game and ball_id == -1 and not on_buttons and pos.x > vp.x * 0.5 and pos.y > vp.y * 0.25:
 				ball_id = event.index
 				ball_origin = pos
+				look_vec = Vector2.ZERO
+				if is_instance_valid(ball_base):
+					ball_base.set_anchors_preset(Control.PRESET_TOP_LEFT)
+					ball_base.offset_left = pos.x - 100.0
+					ball_base.offset_top = pos.y - 100.0
+					ball_base.offset_right = pos.x + 100.0
+					ball_base.offset_bottom = pos.y + 100.0
 				return
-			# Let HUD buttons handle their own touches: bottom-right
-			# KNIFE/EAT cluster + top-right pause must not start a look-drag.
-			var on_buttons := (pos.x > vp.x * 0.55 and pos.y > vp.y * 0.55) or (pos.x > vp.x - 100.0 and pos.y < 260.0)
 			if state == "play" and not paused_game and pos.x < vp.x * 0.5 and pos.y > vp.y * 0.3 and joy_id == -1:
 				joy_id = event.index
 				joy_origin = pos
@@ -1146,6 +1168,8 @@ func _input(event: InputEvent) -> void:
 		else:
 			if event.index == ball_id:
 				ball_id = -1
+				look_vec = Vector2.ZERO
+				look_sm = Vector2.ZERO
 				if is_instance_valid(ball_base) and is_instance_valid(ball_knob):
 					ball_knob.position = (ball_base.size - ball_knob.size) * 0.5
 				return
@@ -1165,13 +1189,15 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenDrag:
 		if event.index == ball_id:
 			if state == "play" and not paused_game:
-				yaw += event.relative.x * 0.006
-				cam_pitch = clampf(cam_pitch + event.relative.y * 0.004, CAM_PITCH_MIN, CAM_PITCH_MAX)
-			if is_instance_valid(ball_base) and is_instance_valid(ball_knob):
-				var boff: Vector2 = (event.position - ball_origin) / 80.0
+				var boff: Vector2 = (event.position - ball_origin) / 90.0
 				if boff.length() > 1.0:
 					boff = boff.normalized()
-				ball_knob.position = (ball_base.size - ball_knob.size) * 0.5 + boff * 52.0
+				look_vec = boff
+			if is_instance_valid(ball_base) and is_instance_valid(ball_knob):
+				var boff2: Vector2 = (event.position - ball_origin) / 90.0
+				if boff2.length() > 1.0:
+					boff2 = boff2.normalized()
+				ball_knob.position = (ball_base.size - ball_knob.size) * 0.5 + boff2 * 52.0
 			return
 		if event.index == joy_id:
 			var d: Vector2 = (event.position - joy_origin) / 85.0
@@ -1274,6 +1300,20 @@ func _physics_process(delta: float) -> void:
 			var fp: Vector3 = (foe["node"] as Node3D).position
 			yaw = atan2(-(fp.x - player_node.position.x), -(fp.z - player_node.position.z))
 	yaw += turn * TURN_SPEED * delta
+	# right stick: smoothed expo rate, deadzone center, fast edges
+	look_sm = look_sm.lerp(look_vec, 1.0 - exp(-14.0 * delta))
+	var lx := look_sm.x
+	var ly := look_sm.y
+	if absf(lx) < LOOK_DEAD:
+		lx = 0.0
+	else:
+		lx = signf(lx) * pow((absf(lx) - LOOK_DEAD) / (1.0 - LOOK_DEAD), LOOK_EXPO)
+	if absf(ly) < LOOK_DEAD:
+		ly = 0.0
+	else:
+		ly = signf(ly) * pow((absf(ly) - LOOK_DEAD) / (1.0 - LOOK_DEAD), LOOK_EXPO)
+	yaw += lx * LOOK_YAW * delta
+	cam_pitch = clampf(cam_pitch + ly * LOOK_PITCH * delta, CAM_PITCH_MIN, CAM_PITCH_MAX)
 	if Input.is_physical_key_pressed(KEY_Q):
 		cam_pitch = min(CAM_PITCH_MAX, cam_pitch + 1.2 * delta)
 	if Input.is_physical_key_pressed(KEY_E):
@@ -2284,7 +2324,7 @@ func _build_hud() -> void:
 	minimap.offset_bottom = 156
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, BALL to look, KNIFE hold to slash, M mute.")
+	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, right stick to look, KNIFE hold to slash, M mute.")
 	var title_tex := TextureRect.new()
 	title_tex.texture = load("res://assets/caterpillar.png") as Texture2D
 	title_tex.custom_minimum_size = Vector2(560, 180)
@@ -2417,6 +2457,7 @@ func _build_touch() -> void:
 	knife.button_up.connect(func() -> void: touch_slash = false)
 	knife.mouse_exited.connect(func() -> void: touch_slash = false)
 	touch_layer.add_child(knife)
+	look_block.append(knife)
 	var eat := Button.new()
 	eat.text = "EAT"
 	eat.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -2430,6 +2471,7 @@ func _build_touch() -> void:
 	eat.mouse_filter = Control.MOUSE_FILTER_STOP
 	eat.pressed.connect(_on_eat_button)
 	touch_layer.add_child(eat)
+	look_block.append(eat)
 	ball_base = Panel.new()
 	ball_base.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	ball_base.offset_left = -216
@@ -2448,7 +2490,7 @@ func _build_touch() -> void:
 	ball_knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ball_base.add_child(ball_knob)
 	var ball_label := Label.new()
-	ball_label.text = "BALL"
+	ball_label.text = "LOOK"
 	ball_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ball_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ball_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -2466,6 +2508,7 @@ func _build_touch() -> void:
 	pausb.mouse_filter = Control.MOUSE_FILTER_STOP
 	pausb.pressed.connect(_on_pause_button)
 	touch_layer.add_child(pausb)
+	look_block.append(pausb)
 	var codex := Button.new()
 	codex.text = "?"
 	codex.set_anchors_preset(Control.PRESET_TOP_LEFT)
