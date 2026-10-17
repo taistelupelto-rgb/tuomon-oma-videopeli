@@ -86,6 +86,38 @@ const SFX_DEATH := preload("res://assets/sfx/game_over.ogg")
 const SFX_CHAINED := preload("res://assets/sfx/chained.ogg")
 const SFX_WARDEN := preload("res://assets/sfx/warden_down.ogg")
 const VOICE_TEXT := preload("res://assets/voices/voices_text.gd")
+# demo-scene grease: fullscreen grain+vignette+scanline post, flowing river
+const POST_SHADER := """shader_type canvas_item;
+uniform float grain_amt = 0.05;
+uniform float vig_amt = 0.55;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+void fragment() {
+	vec2 d = UV - vec2(0.5);
+	float edge = smoothstep(0.95, 0.25, length(d) * 1.7);
+	float g = hash(UV * vec2(1920.0, 1080.0) + vec2(TIME * 61.7, -TIME * 43.3)) - 0.5;
+	float scan = 0.965 + 0.035 * sin(UV.y * 700.0);
+	COLOR = vec4(vec3(0.0), clamp((1.0 - edge) * vig_amt + g * grain_amt, 0.0, 1.0) * scan + g * 0.02);
+}
+"""
+const RIVER_SHADER := """shader_type spatial;
+render_mode blend_mix, cull_disabled, diffuse_lambert, specular_schlick_ggx;
+uniform vec4 deep : source_color = vec4(0.05, 0.2, 0.45, 0.8);
+uniform vec4 foam : source_color = vec4(0.4, 0.8, 1.0, 0.8);
+void fragment() {
+	vec2 w = UV * 24.0;
+	float flow = TIME * 1.2;
+	float bands = sin(w.x * 1.7 + w.y * 3.1 - flow * 4.0) * 0.5 + 0.5;
+	float bands2 = sin(w.x * 3.3 - w.y * 1.2 + flow * 2.0) * 0.5 + 0.5;
+	vec2 cell = floor(w * 3.0);
+	float spark = step(0.986, fract(sin(dot(cell + floor(vec2(flow * 6.0, -flow * 5.0)), vec2(12.9898, 78.233))) * 43758.55));
+	vec3 col = mix(deep.rgb, foam.rgb, bands * bands2 * 0.55);
+	ALBEDO = col;
+	EMISSION = foam.rgb * (bands * bands2 * 0.5 + spark * 1.2);
+	ALPHA = 0.8;
+	ROUGHNESS = 0.08;
+	SPECULAR = 0.7;
+}
+"""
 const JOKER_BG := preload("res://assets/joker.jpg")
 const SFX_SCREAM := preload("res://assets/sfx/death_scream.ogg")
 const SFX_LAUGH := preload("res://assets/sfx/death_laugh.ogg")
@@ -160,10 +192,14 @@ var enemies: Array = [] # {node, mesh, mat, pos(Vector3 x,z in y), hp, maxhp, sp
 var exit_node: Area3D
 var exit_light: OmniLight3D
 var lantern: OmniLight3D
-var river_mat: StandardMaterial3D
+var river_mat: Material
 var river_cells: Array = []
 var torches: Array = []
 var rain: GPUParticles3D
+var dust: GPUParticles3D
+var kill_flash := 0.0
+var kill_rect: ColorRect
+var hitstop_n := 0
 var shit_trail: GPUParticles3D
 var hero_moving := false
 var shit_ammo := SHITBOMB_MAX
@@ -1335,6 +1371,12 @@ func _process(delta: float) -> void:
 		dmg_flash = maxf(0.0, dmg_flash - delta * 2.0)
 	if is_instance_valid(dmg_rect):
 		dmg_rect.color = Color(1, 0.1, 0.1, 0.35 * clampf(dmg_flash, 0.0, 1.0))
+	if kill_flash > 0.0:
+		kill_flash = maxf(0.0, kill_flash - delta * 3.0)
+	if is_instance_valid(kill_rect):
+		kill_rect.color = Color(1, 0.95, 0.8, 0.4 * clampf(kill_flash, 0.0, 1.0))
+	if is_instance_valid(hero_sprite):
+		hero_sprite.modulate = Color(1, 1, 1).lerp(Color(1.4, 1.1, 0.55), clampf(float(combo) / 12.0, 0.0, 1.0))
 	if tick % 60 == 0:
 		var s := get_viewport().get_visible_rect().size
 		cam.fov = 88.0 if s.y > s.x else 70.0
@@ -1441,6 +1483,8 @@ func _physics_process(delta: float) -> void:
 	cam_rig.rotation.y = cam_yaw
 	spring.rotation.x = cam_pitch
 	rain.position = Vector3(player_node.position.x, 6.0, player_node.position.z)
+	if is_instance_valid(dust):
+		dust.position = player_node.position + Vector3(0, 2.0, 0)
 	if is_instance_valid(shit_trail):
 		shit_trail.position = player_node.position + Vector3(0, 0.12, 0)
 		shit_trail.emitting = hero_moving and state == "play" and not paused_game
@@ -1449,10 +1493,6 @@ func _physics_process(delta: float) -> void:
 		lantern.light_energy = 1.15 + sin(tick * 0.11) * 0.08 + sin(tick * 0.043) * 0.06
 	if is_instance_valid(exit_light):
 		exit_light.light_energy = 1.4 + sin(tick * 0.05) * 0.4
-	if river_mat != null:
-		var _uvo: Vector3 = river_mat.uv1_offset
-		_uvo.x += delta * 0.08
-		river_mat.uv1_offset = _uvo
 	for t in torches:
 		if is_instance_valid(t):
 			t.light_energy = 0.9 + sin(tick * 0.09 + t.position.x * 1.7 + t.position.z) * 0.12
@@ -1817,9 +1857,21 @@ func _chained_near(pos: Vector3, r: float) -> bool:
 				return true
 	return false
 
+func _hitstop() -> void:
+	# demo-scene impact freeze: 70ms of near-stillness on every kill, free juice
+	hitstop_n += 1
+	Engine.time_scale = 0.05
+	await get_tree().create_timer(0.07, true, false, true).timeout
+	hitstop_n -= 1
+	if hitstop_n <= 0:
+		hitstop_n = 0
+		Engine.time_scale = 1.0
+
 func _kill_enemy(e: Dictionary) -> void:
 	e["dead"] = true
 	kills += 1
+	kill_flash = 1.0
+	_hitstop()
 	var gain := 50
 	if e["elite"]:
 		gain = 150
@@ -2302,6 +2354,34 @@ func _build_environment() -> void:
 	rain.draw_pass_1 = streak
 	rain.visibility_aabb = AABB(Vector3(-16, -8, -16), Vector3(32, 16, 32))
 	add_child(rain)
+	# cave dust motes drifting around the hero, basically free
+	dust = GPUParticles3D.new()
+	dust.amount = 60
+	dust.lifetime = 5.0
+	dust.preprocess = 5.0
+	dust.local_coords = false
+	var dpm := ParticleProcessMaterial.new()
+	dpm.direction = Vector3(0.3, 0.1, 0.0)
+	dpm.spread = 90.0
+	dpm.initial_velocity_min = 0.2
+	dpm.initial_velocity_max = 0.7
+	dpm.gravity = Vector3.ZERO
+	dpm.scale_min = 0.5
+	dpm.scale_max = 1.2
+	dpm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	dpm.emission_box_extents = Vector3(9, 2.5, 9)
+	dust.process_material = dpm
+	var mote := SphereMesh.new()
+	mote.radius = 0.035
+	mote.height = 0.07
+	var mmat := StandardMaterial3D.new()
+	mmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mmat.albedo_color = Color(1.0, 0.88, 0.65, 0.5)
+	mmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mote.material = mmat
+	dust.draw_pass_1 = mote
+	dust.visibility_aabb = AABB(Vector3(-10, -3, -10), Vector3(20, 8, 20))
+	add_child(dust)
 	# hero shit trail: brown lumps drop at the hero's heels and linger behind
 	shit_trail = GPUParticles3D.new()
 	shit_trail.amount = 48
@@ -2395,15 +2475,10 @@ func _build_room_nodes() -> void:
 	var wall_m := _pixel_mat(WALL_TEX, CAVE_PAL)
 	var pillar_m := _pixel_mat(PILLAR_TEX, CAVE_PAL)
 	var spike_m := _tex_mat("spike", SPIKE_TEX, _spike_pal(), 1.6)
-	river_mat = StandardMaterial3D.new()
-	river_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	river_mat.albedo_color = Color(0.15, 0.45, 0.85, 0.65)
-	river_mat.roughness = 0.1
-	river_mat.metallic = 0.3
-	river_mat.emission_enabled = true
-	river_mat.emission = Color(0.1, 0.3, 0.8)
-	river_mat.emission_energy_multiplier = 0.3
-	river_mat.uv1_scale = Vector3(1, 1, 1)
+	var rsh := Shader.new()
+	rsh.code = RIVER_SHADER
+	river_mat = ShaderMaterial.new()
+	(river_mat as ShaderMaterial).shader = rsh
 	river_cells.clear()
 	# one big floor slab for collision
 	var static_body := StaticBody3D.new()
@@ -2466,6 +2541,31 @@ func _build_room_nodes() -> void:
 				exit_light.omni_range = 7.0
 				exit_light.light_color = Color(0.15, 0.25, 0.4)
 				exit_node.add_child(exit_light)
+				# embers rising off the glowing exit
+				var emb := GPUParticles3D.new()
+				emb.amount = 24
+				emb.lifetime = 1.6
+				emb.preprocess = 1.6
+				emb.local_coords = false
+				var epm := ParticleProcessMaterial.new()
+				epm.direction = Vector3(0, 1, 0)
+				epm.spread = 18.0
+				epm.initial_velocity_min = 1.0
+				epm.initial_velocity_max = 2.5
+				epm.gravity = Vector3(0, 1.0, 0)
+				epm.scale_min = 0.6
+				epm.scale_max = 1.2
+				emb.process_material = epm
+				var spark := BoxMesh.new()
+				spark.size = Vector3(0.09, 0.09, 0.09)
+				var smat := StandardMaterial3D.new()
+				smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				smat.albedo_color = Color(1.0, 0.55, 0.15)
+				spark.material = smat
+				emb.draw_pass_1 = spark
+				emb.visibility_aabb = AABB(Vector3(-3, -1, -3), Vector3(6, 8, 6))
+				emb.position = Vector3(0, 0.3, 0)
+				exit_node.add_child(emb)
 				room_node.add_child(exit_node)
 	var torch_spots: Array = []
 	for base in [SPAWN_CELL, exit_cell]:
@@ -2749,6 +2849,24 @@ func _build_hud() -> void:
 	_dmg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_dmg)
 	dmg_rect = _dmg
+	var _kill := ColorRect.new()
+	_kill.name = "KillFlash"
+	_kill.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_kill.color = Color(1, 0.95, 0.8, 0)
+	_kill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(_kill)
+	kill_rect = _kill
+	# demo-scene post: grain + vignette + scanlines over everything, one draw
+	var psh := Shader.new()
+	psh.code = POST_SHADER
+	var post := ColorRect.new()
+	post.name = "PostGrease"
+	post.set_anchors_preset(Control.PRESET_FULL_RECT)
+	post.color = Color(1, 1, 1, 1)
+	post.material = ShaderMaterial.new()
+	(post.material as ShaderMaterial).shader = psh
+	post.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(post)
 	_build_touch()
 
 func _cs_clip(idx: int, n: int) -> String:
