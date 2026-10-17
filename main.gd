@@ -22,6 +22,11 @@ const KNIFE_ARC := 1.0 # radians, half-angle
 const CAM_PITCH_MIN := -0.35
 const CAM_PITCH_MAX := 0.6
 const FOLLOW_CAM := true
+const SHITBOMB_MAX := 3
+const SHITBOMB_REGEN := 8.0
+const SHITBOMB_RADIUS := 4.5
+const SHITBOMB_DMG := 2
+const SHITBOMB_GRAV := 22.0
 
 const ROOM_DEFS := [
 	{"name": "ROOM A — SPAWN CAVE", "about": "Grab the crystal, find the glowing exit. Every run, a new cave.", "pillars": 2, "crys": 1, "en": 0, "spikes": 0, "elites": 0, "heart": false, "sharp": false},
@@ -153,6 +158,10 @@ var torches: Array = []
 var rain: GPUParticles3D
 var shit_trail: GPUParticles3D
 var hero_moving := false
+var shit_ammo := SHITBOMB_MAX
+var shit_regen_t := 0.0
+var shitbombs: Array = [] # flying turds: {node, vel, t}
+var shitsplats: Array = [] # ground splats: {node, mat, t}
 
 var hud_top: Label
 var hud_cap: Label
@@ -804,6 +813,16 @@ func start_run(new_seed: int) -> void:
 	ball_id = -1
 	look_vec = Vector2.ZERO
 	look_sm = Vector2.ZERO
+	shit_ammo = SHITBOMB_MAX
+	shit_regen_t = 0.0
+	for b in shitbombs:
+		if is_instance_valid(b.get("node") as Node3D):
+			(b.get("node") as Node3D).queue_free()
+	shitbombs.clear()
+	for s in shitsplats:
+		if is_instance_valid(s.get("node") as Node3D):
+			(s.get("node") as Node3D).queue_free()
+	shitsplats.clear()
 	if is_instance_valid(ball_knob) and is_instance_valid(ball_base):
 		ball_knob.position = (ball_base.size - ball_knob.size) * 0.5
 	joy_vec = Vector2.ZERO
@@ -1261,6 +1280,8 @@ func _input(event: InputEvent) -> void:
 		elif k == KEY_M:
 			AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
 			announce("Muted" if AudioServer.is_bus_mute(0) else "Sound on")
+		elif k == KEY_G and state == "play" and not paused_game:
+			throw_shitbomb()
 		elif state == "play" and not paused_game and k >= KEY_1 and k <= KEY_8:
 			inv_use(k - KEY_1)
 
@@ -1438,8 +1459,121 @@ func _physics_process(delta: float) -> void:
 			(ex["node"] as Node3D).position.y = 0.9 + sin(tick * 0.06 + (ex["pos"] as Vector3).x * 2.0) * 0.08
 	_spike_update()
 	_exit_update()
+	_shitbomb_update(delta)
 	_lore_sightings()
 	_refresh_hud()
+
+# ---------------- shit bomb: arcing turd, radial splash, pooling splats ----
+func _shit_mat() -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = Color(0.35, 0.22, 0.1)
+	return m
+
+func throw_shitbomb() -> void:
+	if state != "play" or paused_game:
+		return
+	if shit_ammo <= 0:
+		announce("Shit bomb reloading...")
+		return
+	shit_ammo -= 1
+	var n := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.24
+	sm.height = 0.48
+	sm.material = _shit_mat()
+	n.mesh = sm
+	var pp := player_node.position
+	n.position = pp + Vector3(0, 1.2, 0)
+	(room_node if room_node else self).add_child(n)
+	var fw := Vector2(-sin(yaw), -cos(yaw))
+	shitbombs.append({"node": n, "vel": Vector3(fw.x * 14.0, 5.5, fw.y * 14.0), "t": 0.0})
+	play_sfx(SFX_SLASH)
+	_refresh_hud()
+
+func _explode_shitbomb(p: Vector3) -> void:
+	# splash: brown burst with gravity + drag reads as fluid spray
+	_poof(p + Vector3(0, 0.4, 0), Color(0.4, 0.26, 0.12))
+	_poof(p + Vector3(0, 0.2, 0), Color(0.25, 0.15, 0.07))
+	var hit_any := false
+	for e in enemies:
+		if e["dead"] or e.get("enslaved", false):
+			continue
+		var ep: Vector3 = (e["node"] as Node3D).position
+		if Vector2(ep.x - p.x, ep.z - p.z).length() > SHITBOMB_RADIUS:
+			continue
+		hit_any = true
+		e["hp"] = int(e["hp"]) - SHITBOMB_DMG
+		e["cool"] = 0.35
+		e["flash"] = 0.12
+		if e["type"] == "tuhkanaama" and int(e["hp"]) <= 0:
+			_enslave(e) # the soot-face cannot die. It kneels.
+			continue
+		if int(e["hp"]) <= 0:
+			_kill_enemy(e)
+	if hit_any:
+		foe_yell()
+	# pooling splat: spreads fast, then dries out and frees itself
+	var splat := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.3
+	cm.bottom_radius = 0.3
+	cm.height = 0.05
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(0.35, 0.22, 0.1, 0.9)
+	cm.material = mat
+	splat.mesh = cm
+	splat.position = Vector3(p.x, 0.06, p.z)
+	(room_node if room_node else self).add_child(splat)
+	shitsplats.append({"node": splat, "mat": mat, "t": 0.0})
+
+func _shitbomb_update(delta: float) -> void:
+	for i in range(shitbombs.size() - 1, -1, -1):
+		var b: Dictionary = shitbombs[i]
+		if not is_instance_valid(b.get("node") as Node3D):
+			shitbombs.remove_at(i)
+			continue
+		var n: Node3D = b["node"]
+		var v: Vector3 = b["vel"]
+		v.y -= SHITBOMB_GRAV * delta
+		n.position += v * delta
+		b["vel"] = v
+		b["t"] = float(b["t"]) + delta
+		var boom := n.position.y <= 0.12 or float(b["t"]) > 3.0
+		if not boom:
+			for e in enemies:
+				if e["dead"] or e.get("enslaved", false):
+					continue
+				if n.position.distance_to((e["node"] as Node3D).position + Vector3(0, 0.8, 0)) < 1.2:
+					boom = true
+					break
+		if boom:
+			_explode_shitbomb(n.position)
+			n.queue_free()
+			shitbombs.remove_at(i)
+	if shit_ammo < SHITBOMB_MAX:
+		shit_regen_t += delta
+		if shit_regen_t >= SHITBOMB_REGEN:
+			shit_regen_t = 0.0
+			shit_ammo += 1
+			_refresh_hud()
+	for i in range(shitsplats.size() - 1, -1, -1):
+		var s: Dictionary = shitsplats[i]
+		if not is_instance_valid(s.get("node") as Node3D):
+			shitsplats.remove_at(i)
+			continue
+		var t := float(s["t"]) + delta
+		s["t"] = t
+		var n2: Node3D = s["node"]
+		var r := minf(1.4, 0.3 + t * 1.6) # fast spread, capped pool
+		n2.scale = Vector3(r / 0.3, 1.0, r / 0.3)
+		if t > 4.0:
+			(s["mat"] as StandardMaterial3D).albedo_color.a = maxf(0.0, 0.9 - (t - 4.0) * 0.45)
+		if t >= 6.0:
+			n2.queue_free()
+			shitsplats.remove_at(i)
 
 func _knife_hits() -> void:
 	probe_calls += 1
@@ -1730,7 +1864,7 @@ func _inv_text() -> String:
 		parts.append("%d:%s x%d" % [i + 1, String(inventory[i]["kind"]), int(inventory[i]["count"])])
 	while parts.size() < INV_SLOTS:
 		parts.append("%d:--" % (parts.size() + 1))
-	return "PACK [" + "  ".join(parts) + "]  (1-8 use)"
+	return "PACK [" + "  ".join(parts) + "]  (1-8 use)  SHIT %d/%d (G)" % [shit_ammo, SHITBOMB_MAX]
 
 func _melon_slot() -> int:
 	for i in inventory.size():
@@ -2324,7 +2458,7 @@ func _build_hud() -> void:
 	minimap.offset_bottom = 156
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, right stick to look, KNIFE hold to slash, M mute.")
+	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, right stick to look, KNIFE hold to slash, G shit bomb, M mute.")
 	var title_tex := TextureRect.new()
 	title_tex.texture = load("res://assets/caterpillar.png") as Texture2D
 	title_tex.custom_minimum_size = Vector2(560, 180)
@@ -2472,6 +2606,19 @@ func _build_touch() -> void:
 	eat.pressed.connect(_on_eat_button)
 	touch_layer.add_child(eat)
 	look_block.append(eat)
+	var shit := Button.new()
+	shit.text = "SHIT"
+	shit.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	shit.offset_left = -336
+	shit.offset_top = -152
+	shit.offset_right = -200
+	shit.offset_bottom = -24
+	shit.add_theme_font_size_override("font_size", 28)
+	shit.focus_mode = Control.FOCUS_NONE
+	shit.mouse_filter = Control.MOUSE_FILTER_STOP
+	shit.pressed.connect(throw_shitbomb)
+	touch_layer.add_child(shit)
+	look_block.append(shit)
 	ball_base = Panel.new()
 	ball_base.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	ball_base.offset_left = -216
