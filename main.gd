@@ -1222,12 +1222,14 @@ func _gen_grid() -> void:
 					x["maxhp"] = x["hp"]
 					x["sp"] = float(x["sp"]) + 0.8
 					break
-	if bool(d.get("heart", false)) and modifier != "FAMINE" and rng.randf() < 0.5:
-		var hp2 := _free_cell(taken, 1.5)
-		taken.append(hp2)
-		if not _bfs_reachable(SPAWN_CELL).has(hp2):
-			_carve_line(SPAWN_CELL, hp2)
-		extras.append({"cell": hp2, "kind": "heart", "taken": false})
+	if modifier != "FAMINE":
+		var nheart := 1 + (1 if ri >= 1 and rng.randf() < 0.5 else 0)
+		for k in nheart:
+			var hp2 := _free_cell(taken, 1.5)
+			taken.append(hp2)
+			if not _bfs_reachable(SPAWN_CELL).has(hp2):
+				_carve_line(SPAWN_CELL, hp2)
+			extras.append({"cell": hp2, "kind": "heart", "taken": false})
 	if bool(d.get("sharp", false)) and rng.randf() < 0.65:
 		var shp := _free_cell(taken, 1.5)
 		taken.append(shp)
