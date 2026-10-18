@@ -189,6 +189,8 @@ const SEED_CD := 2.0
 const SEED_RANGE := 16.0
 const SEED_SPEED := 12.0
 const MUSIC_STREAM := preload("res://assets/music.mp3")
+const MUSIC_BASE_DB := -10.0
+const MUSIC_DUCK_DB := -24.0
 const DMG_YELL := preload("res://assets/voices/dmg_yell_01.ogg")
 const FOE_YELL := preload("res://assets/voices/foe_yell_01.ogg")
 const ENEMY_LOOK := preload("res://assets/diarra.jpg")
@@ -206,6 +208,7 @@ var voice_bank := {}
 var voice_cache := {}
 var tex_cache := {}
 var voice_cd := 0.0
+var duck_t := 0.0
 var exit_voiced := -1
 
 var state := "title" # title | play | dead | win
@@ -253,6 +256,7 @@ var spike_cd := 0.0
 var room_node: Node3D
 var items: Array = []   # {cell, pos, taken, node, spin}
 var extras: Array = []  # {cell, pos, kind, taken, node}
+var crowd: Array = []
 var enemies: Array = [] # {node, mesh, mat, pos(Vector3 x,z in y), hp, maxhp, sp, type, elite, boss, mode, t, st, vx, vz, cool, dead, hit_swing}
 var exit_node: Area3D
 var exit_light: OmniLight3D
@@ -403,6 +407,9 @@ func say(cat: String, pos: Vector3 = Vector3.INF, vol := -4.0) -> void:
 	if cat in ["foe_chase", "foe_dash", "foe_tuhk", "boss_see", "boss_die", "boss_taunt"]:
 		vol = 2.0
 	play_sfx(stream, pos, vol)
+	if music_player != null and music_player.playing:
+		music_player.volume_db = MUSIC_DUCK_DB
+		duck_t = maxf(duck_t, stream.get_length() + 0.4)
 	var sub: String = VOICE_TEXT.LINES.get(f, "")
 	if sub != "" and cap_t <= 1.0:
 		announce(sub)
@@ -564,6 +571,21 @@ const CRYS := [
 	"................",
 	"................",
 ]
+const CROWD_N := 50
+const CROWD_PX := [
+	"..HHHH..",
+	"..HHHH..",
+	"..FFFF..",
+	"..FFFF..",
+	".BBBBBB.",
+	".BBBBBB.",
+	".BBBBBB.",
+	"..BBBB..",
+	"...BB...",
+	"...LL...",
+	"...LL...",
+	"..SSSS..",
+]
 const HEART := [
 	"................",
 	"................",
@@ -635,6 +657,18 @@ const MELON := [
 	"................",
 	"................",
 	"................",
+]
+const MOAB_PX := [
+	".....WW.....",
+	"......WW....",
+	".....BB.....",
+	"...BBBBBB...",
+	"..BBGGBBBB..",
+	"..BBGGBBBB..",
+	"..BBBBBBBB..",
+	"..BBBBBBBB..",
+	"...BBBBBB...",
+	".....BB.....",
 ]
 const ARC_SLASH := [
 	"................",
@@ -883,6 +917,8 @@ func _halo_color(kind: String) -> Color:
 		return Color(1.0, 0.8, 0.25, 0.45)
 	if kind == "boots":
 		return Color(1.0, 0.55, 0.2, 0.45)
+	if kind == "moab":
+		return Color(1.0, 0.55, 0.2, 0.5)
 	return Color(0.3, 1.0, 0.45, 0.45) # crys + default green
 
 func _get_shadow_tex() -> Texture2D:
@@ -960,6 +996,8 @@ func _enemy_tex(etype: String, boss: bool) -> Array:
 	return [IMP_CHASE, {"R": Color(0.85, 0.15, 0.12), "r": Color(0.5, 0.08, 0.08), "H": Color(1.0, 0.85, 0.4), "W": Color(1, 1, 1), "B": Color(0.15, 0.1, 0.12), "K": Color(0.03, 0.02, 0.03)}]
 
 func _item_tex(kind: String) -> Array:
+	if kind == "moab":
+		return [MOAB_PX, _moab_pal()]
 	if kind == "heart":
 		return [HEART, {"H": Color(0.9, 0.1, 0.15), "h": Color(0.5, 0.05, 0.08), "W": Color(1, 1, 1)}]
 	if kind == "sharp":
@@ -1179,6 +1217,7 @@ func _gen_grid() -> void:
 		grid[exit_cell.y][exit_cell.x] = "E"
 	items.clear()
 	extras.clear()
+	crowd.clear()
 	enemies.clear()
 	var ncrys: int = int(d.get("crys", 0)) + (1 if modifier == "RICH" else 0)
 	for k in ncrys:
@@ -1255,6 +1294,12 @@ func _gen_grid() -> void:
 		if not _bfs_reachable(SPAWN_CELL).has(mp):
 			_carve_line(SPAWN_CELL, mp)
 		extras.append({"cell": mp, "kind": "melon", "taken": false})
+	if rng.randf() < 0.4:
+		var qp := _free_cell(taken, 1.5)
+		taken.append(qp)
+		if not _bfs_reachable(SPAWN_CELL).has(qp):
+			_carve_line(SPAWN_CELL, qp)
+		extras.append({"cell": qp, "kind": "moab", "taken": false})
 
 func _new_enemy(p: Vector2i, etype: String, elite: bool, boss: bool, fast: float) -> Dictionary:
 	var hpv := 2
@@ -1536,6 +1581,10 @@ func _process(delta: float) -> void:
 	if cap_t > 0.0:
 		cap_t -= delta
 		if cap_t <= 0.0:			hud_cap.text = ""
+	if duck_t > 0.0:
+		duck_t -= delta
+		if duck_t <= 0.0 and music_player != null:
+			music_player.volume_db = MUSIC_BASE_DB
 	if death_laugh_t >= 0.0:
 		death_laugh_t -= delta
 		if death_laugh_t < 0.0 and state == "dead" and death_laugh_player != null:
@@ -1729,6 +1778,7 @@ func _physics_process(delta: float) -> void:
 	_seed_update(delta)
 	_worm_update(delta)
 	_chained_guns(delta)
+	_crowd_update(delta)
 	_leash_update()
 	_chain_rattle_update()
 	_lore_sightings()
@@ -2271,6 +2321,24 @@ func _kill_enemy(e: Dictionary) -> void:
 	else:
 		say("kill", (e["node"] as Node3D).position)
 
+func _crowd_update(delta: float) -> void:
+	for c in crowd:
+		var n = c.get("node")
+		if not is_instance_valid(n):
+			continue
+		var nn := n as Node3D
+		var dir: Vector2 = c["dir"]
+		var sp: float = c["sp"]
+		var ph: float = c["ph"]
+		var nx: float = nn.position.x + dir.x * sp * delta
+		var nz: float = nn.position.z + dir.y * sp * delta
+		var gx := int(nx / CELL)
+		var gz := int(nz / CELL)
+		if gx < 0 or gz < 0 or gx >= TW or gz >= TH or (grid[gz][gx] as String) != ".":
+			c["dir"] = Vector2.RIGHT.rotated(randf() * TAU)
+			continue
+		nn.position = Vector3(nx, 0.55 + sin(tick * 3.0 + ph) * 0.05, nz)
+
 func _enemy_update(delta: float) -> void:
 	var pp := player_node.position
 	for e in enemies:
@@ -2552,6 +2620,17 @@ func _pickup_update() -> void:
 				(ex["node"] as Node3D).visible = false
 				announce("Sharp knife: double damage.")
 				say("pk_sharp", (ex["node"] as Node3D).position)
+			elif ex["kind"] == "moab":
+				var pos := (ex["node"] as Node3D).position
+				ex["taken"] = true
+				(ex["node"] as Node3D).visible = false
+				score += 250
+				play_sfx(SFX_HIT2, pos)
+				spawn_ring(pos, Color(1.0, 0.6, 0.15))
+				add_shake(0.8)
+				_poof(pos + Vector3.UP, Color(1.0, 0.6, 0.15))
+				_poof(pos + Vector3.UP, Color(0.2, 0.15, 0.1))
+				announce("MOAB! +250. The cave felt that.")
 			else:
 				speed_bonus += 1.0
 				ex["taken"] = true
@@ -2668,6 +2747,20 @@ func _spike_pal() -> Dictionary:
 		"s": Color(0.32, 0.35, 0.42), "R": Color(1.0, 0.12, 0.08),
 		"r": Color(0.45, 0.05, 0.05), "D": Color(0.07, 0.07, 0.10),
 		"d": Color(0.16, 0.16, 0.20), "Y": Color(0.9, 0.75, 0.1),
+	}
+
+func _moab_pal() -> Dictionary:
+	return {
+		"B": Color(0.12, 0.12, 0.16), "G": Color(0.35, 0.35, 0.42),
+		"W": Color(1.0, 0.8, 0.3), "R": Color(1.0, 0.3, 0.15),
+		"Y": Color(1.0, 0.75, 0.2),
+	}
+
+func _crowd_pal() -> Dictionary:
+	return {
+		"H": Color(0.85, 0.72, 0.42), "F": Color(0.9, 0.71, 0.53),
+		"B": Color(0.3, 0.45, 0.75), "L": Color(0.16, 0.16, 0.2),
+		"S": Color(0.62, 0.5, 0.28),
 	}
 
 func _exit_pal() -> Dictionary:
@@ -3053,6 +3146,18 @@ func _build_room_nodes() -> void:
 		ex["taken"] = false
 		var xsh := _add_shadow(room_node, 0.7)
 		xsh.position = Vector3(p.x * CELL, 0.03, p.y * CELL)
+	for i in CROWD_N:
+		var cell := Vector2i(1, 1)
+		for t in 40:
+			var cx := rng.randi_range(0, TW - 1)
+			var cy := rng.randi_range(0, TH - 1)
+			if grid[cy][cx] == ".":
+				cell = Vector2i(cx, cy)
+				break
+		var cn := _sprite3d(_cached_tex("crowd", CROWD_PX, _crowd_pal()), 0.09, 0.55)
+		cn.position = Vector3(cell.x * CELL, 0.55, cell.y * CELL)
+		room_node.add_child(cn)
+		crowd.append({"node": cn, "dir": Vector2.RIGHT.rotated(randf() * TAU), "sp": rng.randf_range(2.0, 4.5), "ph": rng.randf_range(0, TAU)})
 	for e in enemies:
 		_build_enemy_node(e)
 
@@ -3707,7 +3812,7 @@ func _build_audio() -> void:
 	elif music is AudioStreamOggVorbis:
 		(music as AudioStreamOggVorbis).loop = true
 	music_player.stream = music
-	music_player.volume_db = -10.0
+	music_player.volume_db = MUSIC_BASE_DB
 	add_child(music_player)
 	# the hero's pain cry: one dedicated voice, replayed on EVERY hit
 	dmg_yell_player = AudioStreamPlayer.new()
