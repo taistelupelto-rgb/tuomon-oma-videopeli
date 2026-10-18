@@ -1941,6 +1941,9 @@ func _knife_hits() -> void:
 		e["hit_swing"] = swing_id
 		probe_hits += 1
 		e["hp"] = int(e["hp"]) - knife_dmg
+		if String(e["type"]) == "boss" and float(e.get("hit_yell_t", 0.0)) <= 0.0:
+			e["hit_yell_t"] = 1.5
+			_paleface_yell(e, ep)
 		e["cool"] = 0.35
 		e["flash"] = 0.12
 		combo += 1
@@ -2180,14 +2183,18 @@ func _enemy_update(delta: float) -> void:
 		if dist < 1.1 and iframes <= 0.0 and not e.get("enslaved", false):
 			hurt("daemon")
 
+func _paleface_yell(e: Dictionary, pos: Vector3) -> void:
+	var index := int(e.get("yell_i", 0)) % PALEFACE_LINES.size()
+	e["yell_i"] = int(e.get("yell_i", 0)) + 1
+	say("boss_taunt", pos)
+	announce(PALEFACE_LINES[index])
+
 func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, delta: float) -> void:
+	e["hit_yell_t"] = maxf(0.0, float(e.get("hit_yell_t", 0.0)) - delta)
 	e["yell_t"] = float(e.get("yell_t", 3.0)) - delta
 	if float(e["yell_t"]) <= 0.0:
-		e["yell_t"] = 5.0 + rng.randf() * 2.0
-		var yi := int(e.get("yell_i", 0)) % PALEFACE_LINES.size()
-		e["yell_i"] = int(e.get("yell_i", 0)) + 1
-		say("boss_taunt", n.position)
-		announce(PALEFACE_LINES[yi])
+		e["yell_t"] = 2.2 + rng.randf() * 1.0
+		_paleface_yell(e, n.position)
 	e["t"] = float(e["t"]) - delta
 	if e["mode"] == "stalk":
 		n.velocity.x = dir.x * float(e["sp"])
