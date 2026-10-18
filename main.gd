@@ -200,7 +200,7 @@ const VOICE_COUNTS := {"room_a": 8, "room_b": 8, "room_c": 8, "room_d": 8,
 	"pk_crys": 8, "pk_heart": 8, "pk_sharp": 6, "pk_boots": 6, "pk_melon": 8,
 	"hurt": 10, "spike": 6, "kill": 12, "combo": 8, "chain": 8,
 	"boss_taunt": 8, "boss_die": 4, "win": 6, "die": 8,
-	"lowhp": 8, "idle": 16, "exit_need": 6, "exit_open": 4}
+	"lowhp": 8, "idle": 16, "exit_need": 6, "exit_open": 4, "paleface": 3}
 var voice_bank := {}
 var voice_cache := {}
 var tex_cache := {}
@@ -379,7 +379,7 @@ func _build_voice_bank() -> void:
 			arr.append("%s_%02d.ogg" % [cat, i])
 		voice_bank[cat] = arr
 
-func say(cat: String, pos: Vector3 = Vector3.INF) -> void:
+func say(cat: String, pos: Vector3 = Vector3.INF, vol := -6.0) -> void:
 	if state != "play" or voice_cd > 0.0:
 		return
 	if not voice_bank.has(cat) or (voice_bank[cat] as Array).is_empty():
@@ -395,7 +395,7 @@ func say(cat: String, pos: Vector3 = Vector3.INF) -> void:
 			return
 		voice_cache[f] = stream
 	voice_cd = 5.0
-	play_sfx(stream, pos)
+	play_sfx(stream, pos, vol)
 	var sub: String = VOICE_TEXT.LINES.get(f, "")
 	if sub != "" and cap_t <= 1.0:
 		announce(sub)
@@ -1248,7 +1248,7 @@ func _new_enemy(p: Vector2i, etype: String, elite: bool, boss: bool, fast: float
 	if elite:
 		hpv = 4
 	if boss:
-		hpv = 20
+		hpv = 8
 	if etype == "tuhkanaama" and not boss:
 		hpv = maxi(hpv, 3)
 	return {"cell": p, "type": etype, "elite": elite, "boss": boss,
@@ -2219,10 +2219,11 @@ func _enemy_update(delta: float) -> void:
 			hurt("daemon")
 
 func _paleface_yell(e: Dictionary, pos: Vector3) -> void:
-	var index := int(e.get("yell_i", 0)) % PALEFACE_LINES.size()
+	var yi := int(e.get("yell_i", 0)) % PALEFACE_LINES.size()
 	e["yell_i"] = int(e.get("yell_i", 0)) + 1
-	say("boss_taunt", pos)
-	announce(PALEFACE_LINES[index])
+	say("paleface", pos, 6.0)
+	voice_cd = minf(voice_cd, 2.0)
+	announce(PALEFACE_LINES[yi])
 
 func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, delta: float) -> void:
 	e["hit_yell_t"] = maxf(0.0, float(e.get("hit_yell_t", 0.0)) - delta)
@@ -3642,11 +3643,11 @@ func foe_yell(pos: Vector3 = Vector3.INF) -> void:
 	foe_yell_player.position = pos
 	foe_yell_player.play()
 
-func play_sfx(stream: AudioStream, pos: Vector3 = Vector3.INF) -> void:
+func play_sfx(stream: AudioStream, pos: Vector3 = Vector3.INF, vol := -6.0) -> void:
 	var p: AudioStreamPlayer3D = sfx_players[sfx_i]
 	sfx_i = (sfx_i + 1) % sfx_players.size()
 	p.stream = stream
-	p.volume_db = -6.0
+	p.volume_db = vol
 	if pos == Vector3.INF:
 		pos = player_node.position if is_instance_valid(player_node) else Vector3.ZERO
 	p.position = pos
