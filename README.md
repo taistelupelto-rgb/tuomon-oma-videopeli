@@ -4,7 +4,7 @@
 
 ## The hero
 
-![caterpillar](assets/caterpillar.png)
+![femboy](assets/femboy.png)
 
 Spawned in a dark cave. No armor. No backup. One knife.
 

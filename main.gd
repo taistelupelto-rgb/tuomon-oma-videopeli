@@ -1,5 +1,5 @@
 extends Node3D
-# CATERPILLAR: Knife of the Mother 3D — Godot remake.
+# ANI: Knife of the Exile 3D — Godot remake.
 # Concept kept from bridge-runner.html: seeded cave rooms, modifiers,
 # elites, spikes, permadeath, knife combat, crystals, exit, cave warden.
 # Single scene, everything built in code. GDScript only, web-safe.
@@ -3153,7 +3153,7 @@ func _build_hud() -> void:
 	minimap.game = self
 	title_panel = _overlay(layer, "ANI: KNIFE OF THE EXILE 3D  [" + BUILD_TAG + "]", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, right stick to look, KNIFE hold to slash, G shit bomb, M mute.")
 	var title_tex := TextureRect.new()
-	title_tex.texture = load("res://assets/caterpillar.png") as Texture2D
+	title_tex.texture = load("res://assets/femboy.png") as Texture2D
 	title_tex.custom_minimum_size = Vector2(560, 180)
 	title_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	title_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
@@ -3209,12 +3209,6 @@ func _build_hud() -> void:
 	cs_faces.alignment = BoxContainer.ALIGNMENT_CENTER
 	cs_faces.add_theme_constant_override("separation", 24)
 	cs_vb.add_child(cs_faces)
-	var cs_mom := TextureRect.new()
-	cs_mom.texture = load("res://assets/caterpillar.png") as Texture2D
-	cs_mom.custom_minimum_size = Vector2(140, 110)
-	cs_mom.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	cs_mom.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	cs_faces.add_child(cs_mom)
 	var cs_hero := TextureRect.new()
 	cs_hero.texture = load("res://assets/femboy.png") as Texture2D
 	cs_hero.custom_minimum_size = Vector2(110, 110)

@@ -69,7 +69,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="${{ inputs.tag }}"
           fi
-          ZIP="caterpillar-godot-web-${TAG}.zip"
+          ZIP="ani-exile-web-${TAG}.zip"
           (cd build/web && zip -qr "../../$ZIP" .)
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --title "$TAG" --notes "Godot web remake." "$ZIP"
@@ -101,7 +101,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="${{ inputs.tag }}"
           fi
-          ZIP="caterpillar-godot-web-${TAG}.zip"
+          ZIP="ani-exile-web-${TAG}.zip"
           rm -rf /tmp/proddeploy && mkdir -p /tmp/proddeploy
           gh release download "$TAG" --pattern "$ZIP" --dir /tmp/proddeploy
           scp -i ~/.ssh/deploy_key /tmp/proddeploy/"$ZIP" "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/$ZIP"

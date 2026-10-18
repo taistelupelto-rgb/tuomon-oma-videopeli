@@ -150,7 +150,7 @@ const LINES := {
 	"boss_taunt_03.ogg": "Minions! Rise and feed with me!",
 	"boss_taunt_04.ogg": "Charge what I cannot understand. You.",
 	"boss_taunt_05.ogg": "The Mother fed me exits. Still hungry.",
-	"boss_taunt_06.ogg": "Your collar awaits, little caterpillar.",
+	"boss_taunt_06.ogg": "Your collar awaits, little runaway.",
 	"boss_taunt_07.ogg": "Gold hide, iron heart. Try harder.",
 	"boss_taunt_08.ogg": "This gullet is my kennel. Kneel.",
 	"boss_die_01.ogg": "Kind... kill... I remember... good...",

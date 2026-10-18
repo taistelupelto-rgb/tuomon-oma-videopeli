@@ -98,7 +98,7 @@ The Godot 4 remake lives at the repo root (`project.godot`, `main.gd`,
    commit, push, tag (`vX.Y.Z`), push the tag. The
    `.github/workflows/web-export.yml` pipeline (runs on `v*` tags) installs
    the Godot editor plus export templates, exports the Web preset, and
-   attaches `caterpillar-godot-web-vX.Y.Z.zip` to the release. Verify with:
+   attaches `ani-exile-web-vX.Y.Z.zip` to the release. Verify with:
    ```sh
    gh run list --limit 1
    gh release view vX.Y.Z
