@@ -190,6 +190,8 @@ const MUSIC_STREAM := preload("res://assets/music.mp3")
 const DMG_YELL := preload("res://assets/voices/dmg_yell_01.ogg")
 const FOE_YELL := preload("res://assets/voices/foe_yell_01.ogg")
 const ENEMY_LOOK := preload("res://assets/diarra.jpg")
+const BOSS_LOOK := preload("res://assets/paleface.jpg")
+const PALEFACE_LINES := ["emme suostu pelkäämään", "vitun natsit!", "falafel pierettää vitusti"]
 
 const VOICE_COUNTS := {"room_a": 8, "room_b": 8, "room_c": 8, "room_d": 8,
 	"foe_chase": 8, "foe_dash": 8, "foe_tuhk": 8, "boss_see": 6,
@@ -1186,12 +1188,11 @@ func _gen_grid() -> void:
 			etype = "tuhkanaama" # soot-black lurker, fast and tough
 		var fast := (0.8 if modifier == "SWIFT" else 0.0) + (0.5 if modifier == "RICH" else 0.0)
 		enemies.append(_new_enemy(ep, etype, k < int(d.get("elites", 0)), false, fast))
-	if bool(d.get("boss", false)):
-		var bp := _free_cell(taken, 4.0)
-		taken.append(bp)
-		if not _bfs_reachable(SPAWN_CELL).has(bp):
-			_carve_line(SPAWN_CELL, bp)
-		enemies.append(_new_enemy(bp, "boss", false, true, 0.0))
+	var bp := _free_cell(taken, 4.0)
+	taken.append(bp)
+	if not _bfs_reachable(SPAWN_CELL).has(bp):
+		_carve_line(SPAWN_CELL, bp)
+	enemies.append(_new_enemy(bp, "boss", false, true, 0.0))
 	# the run always offers a chain: rooms B-D guarantee one tuhkanaama
 	if ri >= 1:
 		var has_t := false
@@ -2134,6 +2135,13 @@ func _enemy_update(delta: float) -> void:
 			hurt("daemon")
 
 func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, delta: float) -> void:
+	e["yell_t"] = float(e.get("yell_t", 3.0)) - delta
+	if float(e["yell_t"]) <= 0.0:
+		e["yell_t"] = 5.0 + rng.randf() * 2.0
+		var yi := int(e.get("yell_i", 0)) % PALEFACE_LINES.size()
+		e["yell_i"] = int(e.get("yell_i", 0)) + 1
+		say("boss_taunt", n.position)
+		announce(PALEFACE_LINES[yi])
 	e["t"] = float(e["t"]) - delta
 	if e["mode"] == "stalk":
 		n.velocity.x = dir.x * float(e["sp"])
@@ -2858,7 +2866,11 @@ func _build_enemy_node(e: Dictionary) -> void:
 	# every daemon wears the Mother's chosen face (assets/diarra.jpg): the photo as a
 	# billboard, sized to roughly the height the old pixel sprite used
 	var sprite: Sprite3D
-	if ENEMY_LOOK != null:
+	if bool(e["boss"]) and BOSS_LOOK != null:
+		var blook: Texture2D = BOSS_LOOK
+		sprite = _sprite3d(blook, 1.4 / float(maxi(1, blook.get_height())), 0.7 * scale_f)
+		sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+	elif ENEMY_LOOK != null:
 		var look: Texture2D = ENEMY_LOOK
 		sprite = _sprite3d(look, 1.4 / float(maxi(1, look.get_height())), 0.7 * scale_f)
 		sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
