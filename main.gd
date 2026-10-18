@@ -4,13 +4,13 @@ extends Node3D
 # elites, spikes, permadeath, knife combat, crystals, exit, cave warden.
 # Single scene, everything built in code. GDScript only, web-safe.
 
-const TW := 20
-const TH := 13
+const TW := 26
+const TH := 16
 const CELL := 2.0
 const WALL_H := 2.4
 const EXIT_CELL := Vector2i(18, 6)
 var exit_cell: Vector2i = Vector2i(18, 6)
-const SPAWN_CELL := Vector2i(1, 6)
+const SPAWN_CELL := Vector2i(1, 8)
 const WALK_SPEED := 5.2
 const TURN_SPEED := 2.1
 const LOOK_YAW := 2.4 # right-stick max yaw rate, rad/s
@@ -33,7 +33,7 @@ const ROOM_DEFS := [
 	{"name": "ROOM A — SPAWN CAVE", "about": "Grab the crystal, find the glowing exit. Every run, a new cave.", "pillars": 2, "crys": 1, "en": 0, "spikes": 0, "elites": 0, "heart": false, "sharp": false},
 	{"name": "ROOM B — THE BRIDGE", "about": "Daemons guard the pipe. Slash them: face them, hold KNIFE (SPACE).", "pillars": 4, "crys": 2, "en": 2, "spikes": 3, "elites": 1, "heart": true, "sharp": false},
 	{"name": "ROOM C — THE AGENT THINKS", "about": "Crystals are context, the knife is the shell. Clear the room to open the exit.", "pillars": 5, "crys": 2, "en": 3, "spikes": 4, "elites": 1, "heart": true, "sharp": true},
-	{"name": "ROOM D — DELIVERY", "about": "The CAVE WARDEN guards the exit: it charges and calls minions. Kill it.", "pillars": 4, "crys": 1, "en": 2, "spikes": 3, "elites": 1, "boss": true, "heart": false, "sharp": false},
+	{"name": "ROOM D — DELIVERY", "about": "The CAVE WARDEN guards the exit: it charges and calls minions. Kill it.", "pillars": 4, "crys": 1, "en": 4, "spikes": 5, "elites": 2, "boss": true, "heart": false, "sharp": false},
 ]
 
 const MODIFIERS := ["NONE", "NONE", "SWARM", "SWIFT", "FAMINE", "RICH"]
@@ -2346,6 +2346,7 @@ func _paleface_yell(e: Dictionary, pos: Vector3) -> void:
 	announce(PALEFACE_LINES[yi])
 
 func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, delta: float) -> void:
+	var enrage := 1.0 - float(e["hp"]) / float(maxi(1, int(e["maxhp"])))
 	e["hit_yell_t"] = maxf(0.0, float(e.get("hit_yell_t", 0.0)) - delta)
 	e["yell_t"] = float(e.get("yell_t", 3.0)) - delta
 	if float(e["yell_t"]) <= 0.0:
@@ -2353,8 +2354,8 @@ func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, de
 		_paleface_yell(e, n.position)
 	e["t"] = float(e["t"]) - delta
 	if e["mode"] == "stalk":
-		n.velocity.x = dir.x * float(e["sp"])
-		n.velocity.z = dir.y * float(e["sp"])
+		n.velocity.x = dir.x * float(e["sp"]) * (1.0 + enrage)
+		n.velocity.z = dir.y * float(e["sp"]) * (1.0 + enrage)
 		if e["t"] <= 0.0:
 			e["mode"] = "tele"
 			e["t"] = 0.7
@@ -2364,8 +2365,8 @@ func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, de
 		if e["t"] <= 0.0:
 			e["mode"] = "charge"
 			e["t"] = 0.8
-			e["vx"] = dir.x * 9.0
-			e["vz"] = dir.y * 9.0
+			e["vx"] = dir.x * (9.0 + 6.0 * enrage)
+			e["vz"] = dir.y * (9.0 + 6.0 * enrage)
 	else:
 		n.velocity.x = float(e["vx"])
 		n.velocity.z = float(e["vz"])
@@ -2374,12 +2375,12 @@ func _boss_move(e: Dictionary, n: CharacterBody3D, dir: Vector2, dist: float, de
 			e["t"] = 3.0 + rng.randf() * 2.0
 	e["st"] = float(e["st"]) - delta
 	if e["st"] <= 0.0:
-		e["st"] = 9.0
+		e["st"] = maxf(3.0, 9.0 - 5.0 * enrage)
 		var alive := 0
 		for x in enemies:
 			if not x["dead"]:
 				alive += 1
-		if alive < 6:
+		if alive < 8:
 			_spawn_minion(n.position)
 			say("boss_taunt", n.position)
 
