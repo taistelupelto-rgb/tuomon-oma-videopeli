@@ -3691,11 +3691,13 @@ func _build_audio() -> void:
 		p.max_distance = 60.0
 		add_child(p)
 		sfx_players.append(p)
-	# the cave itself: a breath of reverb on everything
+	# Messuhalli tunnelma: a HUGE exhibition-hall tail on everything
 	var rev := AudioEffectReverb.new()
-	rev.room_size = 0.85
-	rev.wet = 0.22
-	rev.predelay_msec = 25.0
+	rev.room_size = 1.0
+	rev.damping = 0.25
+	rev.spread = 1.0
+	rev.wet = 0.45
+	rev.predelay_msec = 70.0
 	AudioServer.add_bus_effect(0, rev)
 	# the Indian-song track loops for the whole run
 	music_player = AudioStreamPlayer.new()
