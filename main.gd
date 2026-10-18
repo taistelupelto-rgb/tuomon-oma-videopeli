@@ -379,7 +379,7 @@ func _build_voice_bank() -> void:
 			arr.append("%s_%02d.ogg" % [cat, i])
 		voice_bank[cat] = arr
 
-func say(cat: String, pos: Vector3 = Vector3.INF, vol := -6.0) -> void:
+func say(cat: String, pos: Vector3 = Vector3.INF, vol := -4.0) -> void:
 	if state != "play" or voice_cd > 0.0:
 		return
 	if not voice_bank.has(cat) or (voice_bank[cat] as Array).is_empty():
@@ -3603,7 +3603,7 @@ func _build_audio() -> void:
 	foe_yell_player.unit_size = 3.5
 	foe_yell_player.max_distance = 60.0
 	foe_yell_player.stream = FOE_YELL
-	foe_yell_player.volume_db = -4.0
+	foe_yell_player.volume_db = 0.0
 	add_child(foe_yell_player)
 	# chain rattle: looped while the hero drags a chained foe along
 	chain_player = AudioStreamPlayer.new()
