@@ -2,6 +2,6 @@
 .godot/
 build/
 # Godot web export staging
-caterpillar-godot-web-*.zip
+ani-exile-web-*.zip
 # Single-file legacy build copies
 caterpillar-knife-of-the-mother-*.html
