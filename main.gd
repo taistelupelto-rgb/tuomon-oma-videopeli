@@ -1254,7 +1254,7 @@ func _new_enemy(p: Vector2i, etype: String, elite: bool, boss: bool, fast: float
 	if elite:
 		hpv = 4
 	if boss:
-		hpv = 8
+		hpv = 3
 	if etype == "tuhkanaama" and not boss:
 		hpv = maxi(hpv, 3)
 	return {"cell": p, "type": etype, "elite": elite, "boss": boss,
