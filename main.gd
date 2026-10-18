@@ -1093,6 +1093,17 @@ func _load_room(idx: int, keep_chained := true) -> void:
 	if idx == 3:
 		play_sfx(SFX_FINAL)
 		announce("FINAL ROUND — " + d["about"])
+		var boss := {}
+		for e in enemies:
+			if bool(e.get("boss")):
+				boss = e
+				break
+		if not boss.is_empty() and is_instance_valid(boss.get("node") as Node3D):
+			var bosspos: Vector3 = (boss["node"] as Node3D).position
+			spawn_ring(bosspos, Color(1.0, 0.75, 0.15))
+			add_shake(1.0)
+			say("boss_see", bosspos)
+			announce("FINAL BATTLE — THE CAVE WARDEN! Kill it kindly.")
 	_play_cutscene(idx)
 
 func _pick_exit_cell() -> Vector2i:
