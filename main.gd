@@ -53,6 +53,7 @@ const LORE_ENEMIES := {
 	"dash": "LUNGE-MAW — it shows its white eyes before it strikes. Old miners say the flash is the last light its victims ever see. Sidestep the telegraph.",
 	"tuhkanaama": "TUHKANAAMA — the Soot-Face. Once the Mother's chimney-sweep, black with honest ash. It fell into the Thinking Dark and now it hungers. It loves watermelons more than anything: each melon recalls the summer fields above. It eats to remember. Its teeth glow white with the memory of every seed it ever spat at the sun. Beat it to 1 HP and it remembers the collar: it kneels, and it is yours. The final exit opens only for masters.",
 	"boss": "THE CAVE WARDEN — heap-big hunger, the Mother's firstborn guard. It charges what it cannot understand and summons the small hungers to its side. Under the gold hide, it still wears its puppy collar. You will not see it. It is there.",
+	"irwin": "IRWIN — the wheelchair warrior. Beat him and he joins the haul, whooping WUHU WAKAWAKAWAKA and hurling shit at his old friends.",
 }
 const LORE_ITEMS := {
 	"crys": "MILK-TOOTH CRYSTAL — a tooth the Mother shed while dreaming of you. The agent drinks these like context. Carry them out.",
@@ -191,6 +192,7 @@ const DMG_YELL := preload("res://assets/voices/dmg_yell_01.ogg")
 const FOE_YELL := preload("res://assets/voices/foe_yell_01.ogg")
 const ENEMY_LOOK := preload("res://assets/diarra.jpg")
 const BOSS_LOOK := preload("res://assets/paleface.jpg")
+const IRWIN_LOOK := preload("res://assets/irwin.jpg")
 const PALEFACE_LINES := ["emme suostu pelkäämään", "vitun natsit!", "falafel pierettää vitusti"]
 
 const VOICE_COUNTS := {"room_a": 8, "room_b": 8, "room_c": 8, "room_d": 8,
@@ -1193,6 +1195,11 @@ func _gen_grid() -> void:
 	if not _bfs_reachable(SPAWN_CELL).has(bp):
 		_carve_line(SPAWN_CELL, bp)
 	enemies.append(_new_enemy(bp, "boss", false, true, 0.0))
+	var ip := _free_cell(taken, 2.5)
+	taken.append(ip)
+	if not _bfs_reachable(SPAWN_CELL).has(ip):
+		_carve_line(SPAWN_CELL, ip)
+	enemies.append(_new_enemy(ip, "irwin", false, false, 0.0))
 	# the run always offers a chain: rooms B-D guarantee one tuhkanaama
 	if ri >= 1:
 		var has_t := false
@@ -1729,6 +1736,9 @@ func _seed_update(delta: float) -> void:
 					if e["type"] == "tuhkanaama" and float(e["hp"]) <= 0.0:
 						_enslave(e)
 						continue
+					if String(e["type"]) == "irwin" and float(e["hp"]) <= 0.0:
+						_enslave_irwin(e)
+						continue
 					if float(e["hp"]) <= 0.0:
 						_kill_enemy(e)
 					done = true
@@ -1765,8 +1775,15 @@ func _chained_guns(delta: float) -> void:
 		var dir := (target - from).normalized()
 		var n := MeshInstance3D.new()
 		var bm := BoxMesh.new()
-		bm.size = Vector3(0.1, 0.1, 0.22)
-		bm.material = seed_mat
+		if String(e["type"]) == "irwin":
+			bm.size = Vector3(0.16, 0.16, 0.16)
+			var shitm := StandardMaterial3D.new()
+			shitm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			shitm.albedo_color = Color(0.35, 0.22, 0.1)
+			bm.material = shitm
+		else:
+			bm.size = Vector3(0.1, 0.1, 0.22)
+			bm.material = seed_mat
 		n.mesh = bm
 		n.position = from
 		(room_node if room_node else self).add_child(n)
@@ -1820,6 +1837,9 @@ func _explode_shitbomb(p: Vector3) -> void:
 		e["flash"] = 0.12
 		if e["type"] == "tuhkanaama" and int(e["hp"]) <= 0:
 			_enslave(e) # the soot-face cannot die. It kneels.
+			continue
+		if String(e["type"]) == "irwin" and int(e["hp"]) <= 0:
+			_enslave_irwin(e)
 			continue
 		if int(e["hp"]) <= 0:
 			_kill_enemy(e)
@@ -1932,6 +1952,9 @@ func _knife_hits() -> void:
 			continue
 		if combo == 5:
 			say("combo", ep)
+		if String(e["type"]) == "irwin" and int(e["hp"]) <= 0:
+			_enslave_irwin(e)
+			continue
 		if int(e["hp"]) <= 0:
 			_kill_enemy(e)
 
@@ -1946,6 +1969,29 @@ func _enslave(e: Dictionary) -> void:
 	_add_leash(e)
 	announce("CHAINED! The tuhkanaama kneels. Haul it to the final exit.")
 	say("chain", (e["node"] as Node3D).position)
+
+func _enslave_irwin(e: Dictionary) -> void:
+	e["enslaved"] = true
+	e["hp"] = 3
+	e["seed_cd"] = 0.5
+	score += 200
+	play_sfx(SFX_DOOR, (e["node"] as Node3D).position)
+	play_sfx(SFX_CHAINED, (e["node"] as Node3D).position)
+	_add_collar(e["node"] as Node3D)
+	_add_leash(e)
+	announce("WUHU WAKAWAKAWAKA!! Irwin joins the haul in his wheelchair!")
+	var wm := StandardMaterial3D.new()
+	wm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	wm.albedo_color = Color(0.12, 0.12, 0.14)
+	var seat := _box(Vector3(0.5, 0.1, 0.5), wm)
+	seat.position = Vector3(0, 0.25, 0)
+	(e["node"] as Node3D).add_child(seat)
+	var wl := _box(Vector3(0.08, 0.4, 0.4), wm)
+	wl.position = Vector3(-0.3, 0.2, 0)
+	(e["node"] as Node3D).add_child(wl)
+	var wr := _box(Vector3(0.08, 0.4, 0.4), wm)
+	wr.position = Vector3(0.3, 0.2, 0)
+	(e["node"] as Node3D).add_child(wr)
 
 func _add_leash(e: Dictionary) -> void:
 	# steel link from the hero femboy to his kneeling pet, restretched every frame
@@ -2869,6 +2915,10 @@ func _build_enemy_node(e: Dictionary) -> void:
 	if bool(e["boss"]) and BOSS_LOOK != null:
 		var blook: Texture2D = BOSS_LOOK
 		sprite = _sprite3d(blook, 1.4 / float(maxi(1, blook.get_height())), 0.7 * scale_f)
+		sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+	elif String(e["type"]) == "irwin" and IRWIN_LOOK != null:
+		var ilook: Texture2D = IRWIN_LOOK
+		sprite = _sprite3d(ilook, 1.4 / float(maxi(1, ilook.get_height())), 0.7 * scale_f)
 		sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 	elif ENEMY_LOOK != null:
 		var look: Texture2D = ENEMY_LOOK
