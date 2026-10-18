@@ -2058,8 +2058,8 @@ func _add_wheelchair(e: Dictionary, n: CharacterBody3D) -> void:
 	e["wheel_ang"] = 0.0
 
 func _roll_wheels(e: Dictionary, n: CharacterBody3D, delta: float) -> void:
-	var wl := e.get("wheel_l") as Node3D
-	var wr := e.get("wheel_r") as Node3D
+	var wl = e.get("wheel_l")
+	var wr = e.get("wheel_r")
 	if not is_instance_valid(wl) or not is_instance_valid(wr):
 		return
 	var speed := Vector2(n.velocity.x, n.velocity.z).length()
@@ -2091,7 +2091,8 @@ func _add_leash(e: Dictionary) -> void:
 	link.mesh = bm
 	(room_node if room_node else self).add_child(link)
 	e["leash"] = link
-	if not is_instance_valid(e.get("halo") as Node3D):
+	var eh = e.get("halo")
+	if not is_instance_valid(eh):
 		e["halo"] = _add_halo(e["node"] as Node3D, Color(1.0, 0.8, 0.25, 0.55), 2.4, 0.9)
 
 func _leash_update() -> void:
@@ -2101,14 +2102,17 @@ func _leash_update() -> void:
 	for e in enemies:
 		if not e.get("enslaved", false) or e["dead"]:
 			continue
-		if not is_instance_valid(e.get("node") as Node3D):
+		var enode = e.get("node")
+		if not is_instance_valid(enode):
 			continue
-		if not is_instance_valid(e.get("leash") as Node3D):
+		var elink = e.get("leash")
+		if not is_instance_valid(elink):
 			_add_leash(e)
-			if not is_instance_valid(e.get("leash") as Node3D):
+			elink = e.get("leash")
+			if not is_instance_valid(elink):
 				continue
-		var link: Node3D = e["leash"]
-		var fp: Vector3 = (e["node"] as Node3D).position + Vector3(0, 1.0, 0)
+		var link := elink as Node3D
+		var fp: Vector3 = (enode as Node3D).position + Vector3(0, 1.0, 0)
 		var d := pp - fp
 		var dist := d.length()
 		if dist < 0.05:
