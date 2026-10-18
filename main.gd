@@ -2030,25 +2030,25 @@ func _add_wheelchair(e: Dictionary, n: CharacterBody3D) -> void:
 	var wm := StandardMaterial3D.new()
 	wm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	wm.albedo_color = Color(0.12, 0.12, 0.14)
-	var seat := _box(Vector3(0.5, 0.1, 0.5), wm)
-	seat.position = Vector3(0, 0.25, 0)
+	var seat := _box(Vector3(1.0, 0.1, 0.5), wm)
+	seat.position = Vector3(0, 0.22, 0)
 	n.add_child(seat)
 	var sm := StandardMaterial3D.new()
 	sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	sm.albedo_color = Color(0.7, 0.7, 0.75)
-	for side in [-0.32, 0.32]:
+	for side in [-0.85, 0.85]:
 		var wheel := MeshInstance3D.new()
 		var cm := CylinderMesh.new()
-		cm.top_radius = 0.2
-		cm.bottom_radius = 0.2
-		cm.height = 0.08
+		cm.top_radius = 0.35
+		cm.bottom_radius = 0.35
+		cm.height = 0.1
 		cm.material = wm
 		wheel.mesh = cm
-		wheel.position = Vector3(side, 0.2, 0)
+		wheel.position = Vector3(side, 0.35, 0)
 		wheel.basis = Basis(Vector3.RIGHT, 0.0) * Basis(Vector3.FORWARD, PI * 0.5)
 		var spoke := MeshInstance3D.new()
 		var sb := BoxMesh.new()
-		sb.size = Vector3(0.03, 0.34, 0.03)
+		sb.size = Vector3(0.04, 0.62, 0.04)
 		sb.material = sm
 		spoke.mesh = sb
 		wheel.add_child(spoke)
@@ -2065,7 +2065,7 @@ func _roll_wheels(e: Dictionary, n: CharacterBody3D, delta: float) -> void:
 	if not is_instance_valid(wl) or not is_instance_valid(wr):
 		return
 	var speed := Vector2(n.velocity.x, n.velocity.z).length()
-	var ang := float(e.get("wheel_ang", 0.0)) + speed * delta / 0.2
+	var ang := float(e.get("wheel_ang", 0.0)) + speed * delta / 0.35
 	e["wheel_ang"] = ang
 	var b := Basis(Vector3.RIGHT, ang) * Basis(Vector3.FORWARD, PI * 0.5)
 	wl.basis = b
