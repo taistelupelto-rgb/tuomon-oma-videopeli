@@ -40,35 +40,35 @@ const MODIFIERS := ["NONE", "NONE", "SWARM", "SWIFT", "FAMINE", "RICH"]
 
 # ---------------- lore ----------------
 # The cave remembers. The codex (key C) holds it all.
-const LORE_INTRO := "Before the cave, there was the Mother: a caterpillar the size of a harvest moon, who ate the sky green and slept under the world. From her last egg hatched you — small, soft, and furious. The cave took your siblings. It left you one knife. No tears. Only knife."
-const LORE_OUTRO := "DELIVERED. The knife returns to the Mother's egg-shell altar, and the cave, for one night, stops hungering. Somewhere below, a new egg cracks. The Mother provides."
+const LORE_INTRO := "Before the cave, there was Ani: Nigerian father, Romani mother, a Finnish passport and a one-way ticket out. He says Finland is ruined — by immigrants, by Fabians, by the architects of one world order. First, he says, revenge. Then the plane. The cave listened. It always listens. It gave him a knife and showed him the stairs down. It never mentioned that the stairs only go one way."
+const LORE_OUTRO := "DELIVERED. The knife is laid down at the final exit and the cave, for one night, stops hungering. Somewhere above, a plane leaves Finland carrying one angry man — son of Nigeria, son of the road — with nobody left to blame but the mirror. The contradiction holds. It always held."
 const LORE_ROOMS := [
-	"ROOM A — the Mother's throat. The walls here are warm. She swallowed this cave whole to hide it from the sky-eaters. The crystal is her milk-tooth. Take it.",
-	"ROOM B — the Bridge. Long ago the caterpillar-folk strung a rope of spit and song across the dark so messages could travel: phone, bot, agent, phone. Daemons nest in the ropes now. They eat messengers.",
-	"ROOM C — the Thinking Dark. The agent dreams here. Every crystal is a thought it almost finished. The knife is the only argument the dark respects. Elites are thoughts that learned to bite back.",
-	"ROOM D — the Warden's gullet. The CAVE WARDEN was the Mother's guard-dog, fed on exit-doors until it forgot every door but hunger. Kill it kindly. It remembers being good.",
+	"ROOM A — Ani's throat. The walls here are warm with everything he swallowed unsaid. A crystal grows where his first grievance lodged. Take it. The exit glows for whoever carries.",
+	"ROOM B — THE BRIDGE. Ani says the Fabians strung the underworld with rope and messages: phone, bot, agent, phone. Daemons nest in the ropes now. They eat messengers. Cut through.",
+	"ROOM C — THE THINKING DARK. One dream for all sleepers — that is the unified order Ani came down to kill. Every crystal is a thought it almost finished. The knife is the only argument the dark respects. Elites bite back.",
+	"ROOM D — the Warden's gullet. The CAVE WARDEN ate every exit-door Ani ever slammed until it forgot every door but hunger. It wears a pale face now. Kill it kindly. It is what Ani would become if he stays.",
 ]
 const LORE_ENEMIES := {
-	"chase": "HOLLOW CHASER — a daemon that forgot its own name and chases yours instead. It runs at what it fears. It fears you rightly.",
-	"dash": "LUNGE-MAW — it shows its white eyes before it strikes. Old miners say the flash is the last light its victims ever see. Sidestep the telegraph.",
-	"tuhkanaama": "TUHKANAAMA — the Soot-Face. Once the Mother's chimney-sweep, black with honest ash. It fell into the Thinking Dark and now it hungers. It loves watermelons more than anything: each melon recalls the summer fields above. It eats to remember. Its teeth glow white with the memory of every seed it ever spat at the sun. Beat it to 1 HP and it remembers the collar: it kneels, and it is yours. The final exit opens only for masters.",
-	"boss": "THE CAVE WARDEN — heap-big hunger, the Mother's firstborn guard. It charges what it cannot understand and summons the small hungers to its side. Under the gold hide, it still wears its puppy collar. You will not see it. It is there.",
+	"chase": "HOLLOW CHASER — a daemon that forgot its own name and chases yours instead. Ani stocked this cave with his suspicions and they breed. It runs at what it fears. It fears you rightly.",
+	"dash": "LUNGE-MAW — it shows its white eyes before it strikes. Ani calls everything that moves in the dark a Fabian. Sidestep the telegraph and correct him with the knife.",
+	"tuhkanaama": "TUHKANAAMA — the Soot-Face, black with honest ash. It fell into the Thinking Dark and now it hungers. It loves watermelons more than anything: each melon recalls the summer fields above. It eats to remember. Its teeth glow white with the memory of every seed it ever spat at the sun. Beat it to 1 HP and it remembers the collar: it kneels, and it is yours. The final exit opens only for masters.",
+	"boss": "THE CAVE WARDEN — heap-big hunger. It charges what it cannot understand and summons the small hungers to its side. Under the pale face it still wears its puppy collar. Ani sees himself in it and looks away. Kill it kindly.",
 	"irwin": "IRWIN — the wheelchair warrior. Beat him and he joins the haul, whooping WUHU WAKAWAKAWAKA and hurling shit at his old friends.",
 }
 const LORE_ITEMS := {
-	"crys": "MILK-TOOTH CRYSTAL — a tooth the Mother shed while dreaming of you. The agent drinks these like context. Carry them out.",
+	"crys": "MILK-TOOTH CRYSTAL — a tooth of the old world Ani refuses to swallow. The agent drinks these like context. Carry them out.",
 	"heart": "BLOOD-APPLE HEART — not an apple, not a heart. It beats anyway. +1 HP. The cave grew it around a miner's lost wedding ring.",
 	"sharp": "GRANDMOTHER'S EDGE — a whetstone that remembers every blade. Permanent double knife damage. It hums lullabies when swung.",
 	"boots": "DANCER'S BOOTS — seven-league slippers, slightly used. The previous owner danced out of the cave and never stopped. Faster feet.",
 	"melon": "SUN-MELON — a watermelon smuggled down from the summer fields. Sweet, heavy, green as envy. Heals. But beware: the Tuhkanaama smells it from three caves away, and it will cross the dark for a taste.",
 }
-const LORE_EXIT := "THE GLOWING EXIT — a door the Warden swallowed and could not digest. It opens only for the worthy: every crystal carried, every daemon answered. The final door demands more: a chained tuhkanaama at your heel. Green means go. Gold means master."
-const LORE_GOAL := "GOAL: break a TUHKANAAMA with your knife (beat it to 1 HP and it kneels), chain it, and haul it through all four rooms to the final exit. The cave only releases masters."
+const LORE_EXIT := "THE GLOWING EXIT — Ani's one-way door out of Finland, swallowed by the Warden and never digested. It opens only for the worthy: every crystal carried, every daemon answered. The final door demands more: a chained tuhkanaama at your heel. Green means go. Blue means the cave is still deciding about you."
+const LORE_GOAL := "GOAL: break a TUHKANAAMA with your knife (beat it to 1 HP and it kneels), chain it, and haul it through all four rooms to the final exit. Ani's plane boards only masters."
 const LORE_MODS := {
 	"SWARM": "Omen SWARM — the dark is extra hungry tonight. More daemons.",
 	"SWIFT": "Omen SWIFT — the daemons drank the underground river. They run fast.",
 	"FAMINE": "Omen FAMINE — no hearts grow this run. The cave keeps them.",
-	"RICH": "Omen RICH — the Mother's pockets are full. Extra crystals, quicker feet.",
+	"RICH": "Omen RICH — Ani's pockets are full. Extra crystals, quicker feet.",
 	"NONE": "Omen NONE — a quiet night in the cave. Relatively.",
 }
 
@@ -3004,7 +3004,7 @@ func _build_enemy_node(e: Dictionary) -> void:
 	n.add_child(col)
 	var pair: Array = _enemy_tex(String(e["type"]), bool(e["boss"]))
 	var ekey := "boss" if bool(e["boss"]) else "enemy_" + String(e["type"])
-	# every daemon wears the Mother's chosen face (assets/diarra.jpg): the photo as a
+	# every daemon wears Ani's chosen face (assets/diarra.jpg): the photo as a
 	# billboard, sized to roughly the height the old pixel sprite used
 	var sprite: Sprite3D
 	if bool(e["boss"]) and BOSS_LOOK != null:
@@ -3149,7 +3149,7 @@ func _build_hud() -> void:
 	minimap.offset_bottom = 156
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "CATERPILLAR: KNIFE OF THE MOTHER 3D  [" + BUILD_TAG + "]", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, right stick to look, KNIFE hold to slash, G shit bomb, M mute.")
+	title_panel = _overlay(layer, "ANI: KNIFE OF THE EXILE 3D  [" + BUILD_TAG + "]", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, right stick to look, KNIFE hold to slash, G shit bomb, M mute.")
 	var title_tex := TextureRect.new()
 	title_tex.texture = load("res://assets/caterpillar.png") as Texture2D
 	title_tex.custom_minimum_size = Vector2(560, 180)
@@ -3279,7 +3279,7 @@ func _cs_clip(idx: int, n: int) -> String:
 func _play_cutscene(idx: int) -> void:
 	# two bangers per level: mother, then hero. World waits, skip always works.
 	cs_lines = [
-		{"file": _cs_clip(idx, 1), "who": "MOTHER"},
+		{"file": _cs_clip(idx, 1), "who": "ANI"},
 		{"file": _cs_clip(idx, 2), "who": "HERO"},
 	]
 	cs_i = -1
