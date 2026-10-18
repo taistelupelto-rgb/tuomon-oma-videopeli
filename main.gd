@@ -2197,7 +2197,7 @@ func _kill_enemy(e: Dictionary) -> void:
 		say("boss_die", (e["node"] as Node3D).position)
 		_spawn_worms((e["node"] as Node3D).position + Vector3(0, 0.8, 0))
 		play_sfx(PALE_DIE, (e["node"] as Node3D).position, 8.0)
-		announce("FUCKING NAZIS!")
+		announce("VITUN NATSSSSHIT!!!!")
 	else:
 		say("kill", (e["node"] as Node3D).position)
 
