@@ -1724,10 +1724,11 @@ func _physics_process(delta: float) -> void:
 func _seed_update(delta: float) -> void:
 	for i in range(seeds.size() - 1, -1, -1):
 		var s: Dictionary = seeds[i]
-		if not is_instance_valid(s.get("node") as Node3D):
+		var sn = s.get("node")
+		if not is_instance_valid(sn):
 			seeds.remove_at(i)
 			continue
-		var n: Node3D = s["node"]
+		var n := sn as Node3D
 		var v: Vector3 = s["vel"]
 		v.y -= 4.0 * delta
 		n.position += v * delta
@@ -1915,10 +1916,11 @@ func _explode_shitbomb(p: Vector3) -> void:
 func _shitbomb_update(delta: float) -> void:
 	for i in range(shitbombs.size() - 1, -1, -1):
 		var b: Dictionary = shitbombs[i]
-		if not is_instance_valid(b.get("node") as Node3D):
+		var bn = b.get("node")
+		if not is_instance_valid(bn):
 			shitbombs.remove_at(i)
 			continue
-		var n: Node3D = b["node"]
+		var n := bn as Node3D
 		var v: Vector3 = b["vel"]
 		v.y -= SHITBOMB_GRAV * delta
 		n.position += v * delta
