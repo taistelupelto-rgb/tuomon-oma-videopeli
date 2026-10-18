@@ -18,7 +18,7 @@ const BUILD_TAG := "v0.61.3"
 const LOOK_PITCH := 2.6 # right-stick max pitch rate, rad/s
 const LOOK_EXPO := 1.35 # stick curve: fine aim center, fast edges
 const LOOK_DEAD := 0.12 # stick deadzone
-const KNIFE_RANGE := 3.0
+const KNIFE_RANGE := 5.0
 const KNIFE_ARC := 1.0 # radians, half-angle
 const CAM_PITCH_MIN := -0.35
 const CAM_PITCH_MAX := 0.6
@@ -1694,7 +1694,7 @@ func _physics_process(delta: float) -> void:
 		slash_arc.visible = attack_t > 0.0
 		if slash_arc.visible:
 			var face := Vector3(-sin(yaw), 0, -cos(yaw))
-			slash_arc.position = player_node.position + face * 1.6 + Vector3(0, 1.0, 0)
+			slash_arc.position = player_node.position + face * 2.7 + Vector3(0, 1.0, 0)
 			var sa := slash_arc.modulate
 			sa.a = clampf(attack_t / 0.28, 0.0, 1.0)
 			slash_arc.modulate = sa
