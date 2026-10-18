@@ -396,7 +396,9 @@ func say(cat: String, pos: Vector3 = Vector3.INF, vol := -4.0) -> void:
 		if stream == null:
 			return
 		voice_cache[f] = stream
-	voice_cd = 5.0
+	voice_cd = 3.0
+	if cat in ["foe_chase", "foe_dash", "foe_tuhk", "boss_see", "boss_die", "boss_taunt"]:
+		vol = 2.0
 	play_sfx(stream, pos, vol)
 	var sub: String = VOICE_TEXT.LINES.get(f, "")
 	if sub != "" and cap_t <= 1.0:
@@ -3653,7 +3655,7 @@ func _build_audio() -> void:
 	foe_yell_player.unit_size = 3.5
 	foe_yell_player.max_distance = 60.0
 	foe_yell_player.stream = FOE_YELL
-	foe_yell_player.volume_db = 0.0
+	foe_yell_player.volume_db = 4.0
 	add_child(foe_yell_player)
 	# chain rattle: looped while the hero drags a chained foe along
 	chain_player = AudioStreamPlayer.new()
