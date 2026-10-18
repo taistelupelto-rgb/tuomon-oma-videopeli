@@ -87,6 +87,7 @@ const SFX_WIN := preload("res://assets/sfx/you_win.ogg")
 const SFX_DEATH := preload("res://assets/sfx/game_over.ogg")
 const SFX_CHAINED := preload("res://assets/sfx/chained.ogg")
 const SFX_WARDEN := preload("res://assets/sfx/warden_down.ogg")
+const PALE_DIE := preload("res://assets/voices/paleface_die.ogg")
 const VOICE_TEXT := preload("res://assets/voices/voices_text.gd")
 # demo-scene grease: fullscreen grain+vignette+scanline post, flowing river
 const POST_SHADER := """shader_type canvas_item;
@@ -279,6 +280,7 @@ var shitbombs: Array = [] # flying turds: {node, vel, t}
 var shitsplats: Array = [] # ground splats: {node, mat, t}
 var chain_player: AudioStreamPlayer
 var seeds: Array = [] # watermelon seeds: {node, vel, t}
+var worms: Array = []
 var leash_mat: StandardMaterial3D
 var seed_mat: StandardMaterial3D
 
@@ -1703,6 +1705,7 @@ func _physics_process(delta: float) -> void:
 	_exit_update()
 	_shitbomb_update(delta)
 	_seed_update(delta)
+	_worm_update(delta)
 	_chained_guns(delta)
 	_leash_update()
 	_chain_rattle_update()
@@ -1746,6 +1749,45 @@ func _seed_update(delta: float) -> void:
 		if done:
 			n.queue_free()
 			seeds.remove_at(i)
+
+func _spawn_worms(pos: Vector3) -> void:
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.85, 0.45, 0.5)
+	for i in 14:
+		var n := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.12, 0.12, 0.3)
+		bm.material = mat
+		n.mesh = bm
+		n.position = pos + Vector3(0, 0.8, 0)
+		var a := rng.randf_range(0.0, TAU)
+		var sp := rng.randf_range(2.0, 5.0)
+		var v := Vector3(cos(a) * sp, rng.randf_range(2.0, 4.0), sin(a) * sp)
+		(room_node if room_node else self).add_child(n)
+		worms.append({"node": n, "vel": v, "t": 0.0, "ph": rng.randf_range(0.0, TAU)})
+
+func _worm_update(delta: float) -> void:
+	for i in range(worms.size() - 1, -1, -1):
+		var w: Dictionary = worms[i]
+		if not is_instance_valid(w.get("node") as Node3D):
+			worms.remove_at(i)
+			continue
+		var n: Node3D = w["node"]
+		var v: Vector3 = w["vel"]
+		var t := float(w["t"]) + delta
+		w["t"] = t
+		v.y -= 9.0 * delta
+		n.position += v * delta
+		if n.position.y <= 0.06:
+			n.position.y = 0.06
+			v = Vector3.ZERO
+		w["vel"] = v
+		n.rotation.y += 6.0 * delta
+		n.scale = Vector3.ONE * (1.0 + 0.15 * sin(t * 20.0 + float(w["ph"])))
+		if t > 3.0:
+			n.queue_free()
+			worms.remove_at(i)
 
 func _chained_guns(delta: float) -> void:
 	if state != "play":
@@ -2148,6 +2190,9 @@ func _kill_enemy(e: Dictionary) -> void:
 		announce("WARDEN DOWN! Reach the glowing exit.")
 		play_sfx(SFX_WARDEN, (e["node"] as Node3D).position)
 		say("boss_die", (e["node"] as Node3D).position)
+		_spawn_worms((e["node"] as Node3D).position + Vector3(0, 0.8, 0))
+		play_sfx(PALE_DIE, (e["node"] as Node3D).position, 8.0)
+		announce("VITUN NATSHHHIT")
 	else:
 		say("kill", (e["node"] as Node3D).position)
 
