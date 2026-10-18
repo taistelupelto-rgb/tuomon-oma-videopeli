@@ -276,6 +276,9 @@ var shit_trail: CPUParticles3D
 var hero_moving := false
 var shit_ammo := SHITBOMB_MAX
 var shit_regen_t := 0.0
+var fish_t := 0.0
+var fish_cd := 0.0
+var fish_spot := Vector3.ZERO
 var shitbombs: Array = [] # flying turds: {node, vel, t}
 var shitsplats: Array = [] # ground splats: {node, mat, t}
 var chain_player: AudioStreamPlayer
@@ -1488,6 +1491,8 @@ func _input(event: InputEvent) -> void:
 			announce("Muted" if AudioServer.is_bus_mute(0) else "Sound on")
 		elif k == KEY_G and state == "play" and not paused_game:
 			throw_shitbomb()
+		elif k == KEY_F and state == "play" and not paused_game:
+			try_fish()
 		elif k == KEY_SPACE and cs_active:
 			_cs_end()
 		elif state == "play" and not paused_game and k >= KEY_1 and k <= KEY_8:
@@ -1711,6 +1716,15 @@ func _physics_process(delta: float) -> void:
 			(ex["node"] as Node3D).position.y = 0.9 + sin(tick * 0.06 + (ex["pos"] as Vector3).x * 2.0) * 0.08
 	_spike_update()
 	_exit_update()
+	if fish_cd > 0.0:
+		fish_cd -= delta
+	if fish_t > 0.0:
+		fish_t -= delta
+		if player_node.position.distance_to(fish_spot) > 3.0:
+			fish_t = 0.0
+			announce("Lost it...")
+		elif fish_t <= 0.0:
+			_fish_catch()
 	_shitbomb_update(delta)
 	_seed_update(delta)
 	_worm_update(delta)
@@ -1842,6 +1856,52 @@ func _chained_guns(delta: float) -> void:
 		seeds.append({"node": n, "vel": dir * SEED_SPEED + Vector3(0, 1.0, 0), "t": 0.0})
 		play_sfx(SFX_PLOP, from) # plop!
 # ---------------- shit bomb: arcing turd, radial splash, pooling splats ----
+func _near_water_pos(r: float) -> Vector3:
+	var best := Vector3.INF
+	var bd := r
+	for c in river_cells:
+		var w := Vector3(float(c.x) * CELL, 0.0, float(c.y) * CELL)
+		var d: float = w.distance_to(player_node.position)
+		if d < bd:
+			bd = d
+			best = w
+	return best
+
+func try_fish() -> void:
+	if state != "play" or paused_game or cs_active:
+		return
+	if fish_cd > 0.0 or fish_t > 0.0:
+		return
+	var w := _near_water_pos(2.5)
+	if w == Vector3.INF:
+		announce("No water in reach. Find the river.")
+		return
+	fish_spot = w
+	fish_t = 2.5
+	fish_cd = 6.0
+	spawn_ring(fish_spot, Color(0.4, 0.8, 1.0))
+	play_sfx(SFX_PLOP, fish_spot)
+	announce("Line cast...")
+
+func _fish_catch() -> void:
+	var roll := rng.randf()
+	if roll < 0.7:
+		if inv_add("fish"):
+			score += 10
+			announce("Caught a river-fish! Packed. (eat with number keys)")
+		else:
+			announce("Pack full! The fish flops back.")
+	elif roll < 0.9:
+		score += 5
+		announce("Old boot. Still counts. +5")
+	else:
+		hp = mini(max_hp, hp + 1)
+		score += 25
+		announce("BIG ONE! +1 HP.")
+	_poof(fish_spot + Vector3(0, 1.0, 0), Color(0.4, 0.8, 1.0))
+	spawn_ring(fish_spot, Color(0.4, 0.8, 1.0))
+	play_sfx(SFX_COIN, fish_spot)
+
 func _shit_mat() -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -2414,14 +2474,14 @@ func inv_use(slot: int) -> void:
 	if slot < 0 or slot >= inventory.size():
 		return
 	var s: Dictionary = inventory[slot]
-	if s["kind"] == "melon" or s["kind"] == "heart":
+	if s["kind"] == "melon" or s["kind"] == "heart" or s["kind"] == "fish":
 		if hp >= max_hp:
 			announce("HP full. Save it for the dark.")
 			return
 		hp = mini(max_hp, hp + 1)
 		s["count"] = int(s["count"]) - 1
 		play_sfx(SFX_COIN)
-		announce("Ate sun-melon." if s["kind"] == "melon" else "Heart consumed. +1 HP.")
+		announce("Ate sun-melon." if s["kind"] == "melon" else ("Ate river-fish. +1 HP." if s["kind"] == "fish" else "Heart consumed. +1 HP."))
 		if int(s["count"]) <= 0:
 			inventory.remove_at(slot)
 	elif s["kind"] == "crys":
@@ -3159,7 +3219,7 @@ func _build_hud() -> void:
 	minimap.offset_bottom = 156
 	layer.add_child(minimap)
 	minimap.game = self
-	title_panel = _overlay(layer, "ANI: KNIFE OF THE EXILE 3D  [" + BUILD_TAG + "]", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, right stick to look, KNIFE hold to slash, G shit bomb, M mute.")
+	title_panel = _overlay(layer, "ANI: KNIFE OF THE EXILE 3D  [" + BUILD_TAG + "]", LORE_GOAL + "\n\n" + LORE_INTRO + "\n\nTap or ENTER to spawn. ENTER/tap cave | SKI JUMP button or J. Left thumb move, right stick to look, KNIFE hold to slash, G shit bomb, F fish, M mute.")
 	var title_tex := TextureRect.new()
 	title_tex.texture = load("res://assets/femboy.png") as Texture2D
 	title_tex.custom_minimum_size = Vector2(560, 180)
