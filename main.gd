@@ -1006,6 +1006,10 @@ func start_run(new_seed: int) -> void:
 		if is_instance_valid(sd.get("node") as Node3D):
 			(sd.get("node") as Node3D).queue_free()
 	seeds.clear()
+	for wm in worms:
+		if is_instance_valid(wm.get("node")):
+			(wm.get("node") as Node3D).queue_free()
+	worms.clear()
 	if chain_player != null and chain_player.playing:
 		chain_player.stop()
 	if is_instance_valid(ball_knob) and is_instance_valid(ball_base):
@@ -1770,10 +1774,11 @@ func _spawn_worms(pos: Vector3) -> void:
 func _worm_update(delta: float) -> void:
 	for i in range(worms.size() - 1, -1, -1):
 		var w: Dictionary = worms[i]
-		if not is_instance_valid(w.get("node") as Node3D):
+		var wn = w.get("node")
+		if not is_instance_valid(wn):
 			worms.remove_at(i)
 			continue
-		var n: Node3D = w["node"]
+		var n := wn as Node3D
 		var v: Vector3 = w["vel"]
 		var t := float(w["t"]) + delta
 		w["t"] = t
