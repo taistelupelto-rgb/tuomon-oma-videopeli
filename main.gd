@@ -1973,6 +1973,51 @@ func _enslave(e: Dictionary) -> void:
 	announce("CHAINED! The tuhkanaama kneels. Haul it to the final exit.")
 	say("chain", (e["node"] as Node3D).position)
 
+func _add_wheelchair(e: Dictionary, n: CharacterBody3D) -> void:
+	var wm := StandardMaterial3D.new()
+	wm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	wm.albedo_color = Color(0.12, 0.12, 0.14)
+	var seat := _box(Vector3(0.5, 0.1, 0.5), wm)
+	seat.position = Vector3(0, 0.25, 0)
+	n.add_child(seat)
+	var sm := StandardMaterial3D.new()
+	sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	sm.albedo_color = Color(0.7, 0.7, 0.75)
+	for side in [-0.32, 0.32]:
+		var wheel := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.2
+		cm.bottom_radius = 0.2
+		cm.height = 0.08
+		cm.material = wm
+		wheel.mesh = cm
+		wheel.position = Vector3(side, 0.2, 0)
+		wheel.basis = Basis(Vector3.RIGHT, 0.0) * Basis(Vector3.FORWARD, PI * 0.5)
+		var spoke := MeshInstance3D.new()
+		var sb := BoxMesh.new()
+		sb.size = Vector3(0.03, 0.34, 0.03)
+		sb.material = sm
+		spoke.mesh = sb
+		wheel.add_child(spoke)
+		n.add_child(wheel)
+		if side < 0.0:
+			e["wheel_l"] = wheel
+		else:
+			e["wheel_r"] = wheel
+	e["wheel_ang"] = 0.0
+
+func _roll_wheels(e: Dictionary, n: CharacterBody3D, delta: float) -> void:
+	var wl := e.get("wheel_l") as Node3D
+	var wr := e.get("wheel_r") as Node3D
+	if not is_instance_valid(wl) or not is_instance_valid(wr):
+		return
+	var speed := Vector2(n.velocity.x, n.velocity.z).length()
+	var ang := float(e.get("wheel_ang", 0.0)) + speed * delta / 0.2
+	e["wheel_ang"] = ang
+	var b := Basis(Vector3.RIGHT, ang) * Basis(Vector3.FORWARD, PI * 0.5)
+	wl.basis = b
+	wr.basis = b
+
 func _enslave_irwin(e: Dictionary) -> void:
 	e["enslaved"] = true
 	e["hp"] = 3
@@ -1983,18 +2028,6 @@ func _enslave_irwin(e: Dictionary) -> void:
 	_add_collar(e["node"] as Node3D)
 	_add_leash(e)
 	announce("WUHU WAKAWAKAWAKA!! Irwin joins the haul in his wheelchair!")
-	var wm := StandardMaterial3D.new()
-	wm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	wm.albedo_color = Color(0.12, 0.12, 0.14)
-	var seat := _box(Vector3(0.5, 0.1, 0.5), wm)
-	seat.position = Vector3(0, 0.25, 0)
-	(e["node"] as Node3D).add_child(seat)
-	var wl := _box(Vector3(0.08, 0.4, 0.4), wm)
-	wl.position = Vector3(-0.3, 0.2, 0)
-	(e["node"] as Node3D).add_child(wl)
-	var wr := _box(Vector3(0.08, 0.4, 0.4), wm)
-	wr.position = Vector3(0.3, 0.2, 0)
-	(e["node"] as Node3D).add_child(wr)
 
 func _add_leash(e: Dictionary) -> void:
 	# steel link from the hero femboy to his kneeling pet, restretched every frame
@@ -2167,6 +2200,8 @@ func _enemy_update(delta: float) -> void:
 		if cell_at_world(n.position) == "w":
 			n.velocity.x *= 0.55
 			n.velocity.z *= 0.55
+		if String(e.get("type")) == "irwin":
+			_roll_wheels(e, n, delta)
 		var _spr: Sprite3D = e.get("sprite")
 		if _spr != null:
 			if float(e.get("flash", 0.0)) > 0.0:
@@ -2290,6 +2325,8 @@ func _chain_follow(e: Dictionary, n: CharacterBody3D, delta: float) -> void:
 		n.velocity.y = -0.5
 	n.move_and_slide()
 	n.rotation.y = atan2(-(pp.x - n.position.x), -(pp.z - n.position.z))
+	if String(e.get("type")) == "irwin":
+		_roll_wheels(e, n, delta)
 
 func _spawn_minion(at: Vector3) -> void:
 	var cell := Vector2i(clampi(int(at.x / CELL), 1, TW - 2), clampi(int(at.z / CELL), 1, TH - 2))
@@ -2943,6 +2980,8 @@ func _build_enemy_node(e: Dictionary) -> void:
 	sprite.modulate = base_mod
 	var esh := _add_shadow(n, 1.0 * scale_f)
 	esh.position = Vector3(0, -0.05, 0)
+	if String(e["type"]) == "irwin":
+		_add_wheelchair(e, n)
 	if e.get("enslaved", false):
 		_add_collar(n) # chains travel between rooms
 		_add_leash(e)
